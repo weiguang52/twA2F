@@ -6,6 +6,8 @@ from typing import Dict, List, Optional
 import numpy as np
 
 from .settings import EMOTION_LABELS, HOP, NUM_FEATURES, WINDOW
+from .emotion_control import EmotionControl, _vector
+from .emotion_latent import EmotionLatentLibrary
 
 
 def now() -> float:
@@ -63,12 +65,27 @@ def _safe_dim_to_int(d):
     return d if isinstance(d, int) else None
 
 
-def _infer_input_array(inp, audio_chunk, target_emotion="neutral", emotion_intensity=1.0):
+def _infer_input_array(inp, audio_chunk, target_emotion="neutral", emotion_intensity=1.0,
+                       explicit_weights=None, implicit_vector=None, emotion_vector=None):
     name = inp.name.lower()
     shape = inp.shape
     rank = len(shape)
     dims = [_safe_dim_to_int(x) for x in shape]
     batch = audio_chunk.shape[0]
+    # Name-based conditioning must precede audio shape heuristics (dynamic dims).
+    if "emotion" in name or "cond" in name:
+        if rank not in (2, 3) or dims[-1] not in (26, None):
+            raise ValueError(f"Expected emotion [B,26] or [B,1,26], got {shape}")
+        if dims[0] not in (batch, None) or (rank == 3 and dims[1] not in (1, None)):
+            raise ValueError(f"Emotion shape {shape} incompatible with audio batch {batch}")
+        if emotion_vector is None:
+            vector = EmotionControl(target_emotion, emotion_intensity, explicit_weights, implicit_vector).vector()
+        else:
+            vector = np.asarray(_vector(emotion_vector, 26, 'emotion_vector'), dtype=np.float32)
+            if np.any(vector[16:] < 0):
+                raise ValueError('Explicit block of emotion_vector must be nonnegative')
+        values = np.broadcast_to(vector, (batch, 26)).copy()
+        return values[:, None, :] if rank == 3 else values
 
     if (
         "audio" in name or "wav" in name or "input" in name
@@ -82,18 +99,6 @@ def _infer_input_array(inp, audio_chunk, target_emotion="neutral", emotion_inten
                 return np.transpose(audio_chunk, (1, 0, 2)).astype(np.float32)
         if rank == 2:
             return audio_chunk[:, 0, :].astype(np.float32)
-
-    if "emotion" in name or "cond" in name:
-        emo_dim = dims[-1] if dims[-1] is not None else len(EMOTION_LABELS)
-        emo_array = np.zeros((batch, emo_dim), dtype=np.float32)
-        idx = 0
-        if target_emotion in EMOTION_LABELS:
-            idx = EMOTION_LABELS.index(target_emotion)
-        if idx < emo_dim:
-            emo_array[:, idx] = float(emotion_intensity)
-        if rank == 3:
-            emo_array = np.expand_dims(emo_array, axis=1)
-        return emo_array
 
     fixed_dims = []
     for i, d in enumerate(dims):
@@ -177,6 +182,9 @@ class A2FModelRuntime:
             force_cpu=force_cpu,
         )
         self.inputs_meta = self.session.get_inputs()
+        latent_path = os.path.join(os.path.dirname(os.path.abspath(model_path)), 'implicit_emo_db.npz')
+        # Shared runtime owns the immutable library; never re-read on a chunk.
+        self.emotion_latent = EmotionLatentLibrary(latent_path) if os.path.isfile(latent_path) else None
         self.warmup_sec = 0.0
         self.warmup_run_sec: List[float] = []
         if warmup > 0:
@@ -227,6 +235,7 @@ class StreamingA2FEngine:
         self.post_sec = 0.0
         self.infer_frames = 0
         self.first_infer_sec: Optional[float] = None
+        self.emotion_provider = None
 
     def _extract_window(self, end_idx: int) -> np.ndarray:
         local_end = end_idx - self.buffer_start_idx
@@ -249,12 +258,14 @@ class StreamingA2FEngine:
             self.buffer = self.buffer[extra:]
             self.buffer_start_idx += extra
 
-    def push_audio_chunk(self, samples_16k_mono: np.ndarray, emotion: str, intensity: float) -> List[Dict]:
+    def push_audio_chunk(self, samples_16k_mono: np.ndarray, emotion: str, intensity: float,
+                         control: Optional[EmotionControl] = None) -> List[Dict]:
         samples_16k_mono = np.asarray(samples_16k_mono, dtype=np.float32)
         if len(samples_16k_mono) == 0:
             return []
         self.current_emotion = emotion
         self.current_intensity = float(intensity)
+        self.current_control = control or EmotionControl(emotion, intensity)
         self.buffer = np.concatenate([self.buffer, samples_16k_mono], axis=0)
         self.total_received += len(samples_16k_mono)
 
@@ -264,9 +275,13 @@ class StreamingA2FEngine:
             x = win.reshape(1, 1, WINDOW).astype(np.float32)
             aligned_audio_rms = _compute_center_rms(win, self.target_sr, center_ms=80.0)
 
+            time_code_s = (self.next_infer_end_idx - WINDOW / 2.0) / float(self.target_sr)
+            frame_control = (self.emotion_provider(time_code_s, aligned_audio_rms)
+                             if self.emotion_provider is not None else self.current_control)
+
             t0 = now()
             ort_inputs = {
-                inp.name: _infer_input_array(inp, x, self.current_emotion, self.current_intensity)
+                inp.name: _infer_input_array(inp, x, emotion_vector=frame_control.vector())
                 for inp in self.inputs_meta
             }
             t1 = now()
@@ -289,8 +304,9 @@ class StreamingA2FEngine:
                 "time_code_s": float(time_code_s),
                 "weights169": weights169,
                 "audio_rms": float(aligned_audio_rms),
-                "emotion": self.current_emotion,
-                "intensity": float(self.current_intensity),
+                "emotion": frame_control.emotion,
+                "intensity": float(frame_control.intensity),
+                "emotion_control": frame_control,
             })
             self.infer_frames += 1
             t5 = now()
@@ -308,5 +324,6 @@ class StreamingA2FEngine:
             need = 0 if rem == 0 else (HOP - rem)
         if need > 0:
             silence = np.zeros(need, dtype=np.float32)
-            outputs.extend(self.push_audio_chunk(silence, self.current_emotion, self.current_intensity))
+            outputs.extend(self.push_audio_chunk(silence, self.current_emotion, self.current_intensity,
+                                                 getattr(self, 'current_control', None)))
         return outputs

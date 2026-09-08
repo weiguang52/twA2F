@@ -21,6 +21,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 import soundfile as sf
+if __package__:
+    from .render_current_head_13dof_npy import DOF_NAMES, draw_face as draw_dof_face, dof_row_to_dict
+else:
+    from render_current_head_13dof_npy import DOF_NAMES, draw_face as draw_dof_face, dof_row_to_dict
 
 FPS = 30
 W = 1280
@@ -46,6 +50,33 @@ FEATURE_NAMES = [
 ]
 
 DEFAULT_MOTOR_NEUTRAL = {
+    # Retain support for recordings made with older local motor names.
+    "right_outer_brow": 0.0,
+    "left_inner_brow": 0.0,
+    "right_inner_brow": 0.0,
+    "left_outer_brow": 0.0,
+    "right_upper_lid_close": 0.0,
+    "left_upper_lid_close": 0.0,
+    "right_lower_lid_raise": 0.0,
+    "left_lower_lid_raise": 0.0,
+    "right_mouth_corner": 0.0,
+    "left_mouth_corner": 0.0,
+    "jaw_open": 0.0,
+    "head_nod": 0.0,
+    # Current-head logical DOFs: jaw closed, other DOFs at midpoint.
+    "right_outer_brow_y": 0.5,
+    "left_inner_brow_y": 0.5,
+    "right_inner_brow_y": 0.5,
+    "left_outer_brow_y": 0.5,
+    "right_upper_lid_y": 0.5,
+    "left_upper_lid_y": 0.5,
+    "right_lower_lid_y": 0.5,
+    "left_lower_lid_y": 0.5,
+    "right_mouth_x": 0.5,
+    "right_mouth_y": 0.5,
+    "left_mouth_x": 0.5,
+    "left_mouth_y": 0.5,
+    "jaw_y": 0.0,
     "jaw": 0.50,
     "mouth_left": 0.50,
     "mouth_right": 0.50,
@@ -268,14 +299,7 @@ def draw_motor_panel(img, motor_names, motor_values_row):
     gap = 42
 
     cv2.putText(img, "robot motor preview", (panel_x, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.8, FG, 2, cv2.LINE_AA)
-    show_names = [
-        "jaw",
-        "mouth_left",
-        "mouth_right",
-        "upper_lid_left",
-        "upper_lid_right",
-        "inner_brow_left",
-    ]
+    show_names = list(motor_names)
     motor_map = {name: float(motor_values_row[idx]) for idx, name in enumerate(motor_names)}
 
     for i, name in enumerate(show_names):
@@ -398,6 +422,7 @@ def main():
     parser.add_argument("--output_video", default=None, help="输出 mp4 路径；默认写到 visualize/videos/<same_name>.mp4")
     parser.add_argument("--transcript", default="", help="可选文本展示")
     parser.add_argument("--ffmpeg_bin", default="ffmpeg")
+    parser.add_argument("--blind_id", default="", help="Hide emotion/intensity labels; show this anonymous trial ID")
     args = parser.parse_args()
 
     input_npy = Path(args.input_npy).resolve()
@@ -420,6 +445,8 @@ def main():
     emotion, intensity = parse_emotion_and_intensity_from_name(input_npy.stem)
     retarget_version = str(meta.get("retarget_version", "unknown"))
     transcript = args.transcript or f"emotion={emotion}  intensity={intensity}  retarget={retarget_version}"
+    if args.blind_id:
+        transcript = f"Trial {args.blind_id}"
 
     output_video.parent.mkdir(parents=True, exist_ok=True)
 
@@ -429,6 +456,8 @@ def main():
 
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(temp_video_path), fourcc, FPS, (W, H))
+        if not writer.isOpened():
+            raise RuntimeError(f"Cannot open video writer: {temp_video_path}")
         face_cx = W // 2 - 120
 
         total_frames = len(video_times)
@@ -452,12 +481,15 @@ def main():
             eye_open = np.clip(1.0 - 0.9 * blink + 0.1 * eye_act, 0.03, 1.0)
             lower_raise = np.clip(0.35 * blink + 0.2 * eye_act, 0.0, 1.0)
 
-            draw_brow(img, face_cx - 130, 280, 120, brow_tilt, brow_lift, side=-1)
-            draw_brow(img, face_cx + 130, 280, 120, brow_tilt, brow_lift, side=1)
-            draw_eye(img, face_cx - 130, 390, eye_open, lower_raise)
-            draw_eye(img, face_cx + 130, 390, eye_open, lower_raise)
-            draw_mouth(img, face_cx, 620, jaw_open, mouth_wide, mouth_round, mouth_lr)
-            draw_chin(img, face_cx, 700, jaw_open)
+            if set(DOF_NAMES).issubset(motor_names):
+                draw_dof_face(img, dof_row_to_dict(motor_names, motors[i]))
+            else:
+                draw_brow(img, face_cx - 130, 280, 120, brow_tilt, brow_lift, side=-1)
+                draw_brow(img, face_cx + 130, 280, 120, brow_tilt, brow_lift, side=1)
+                draw_eye(img, face_cx - 130, 390, eye_open, lower_raise)
+                draw_eye(img, face_cx + 130, 390, eye_open, lower_raise)
+                draw_mouth(img, face_cx, 620, jaw_open, mouth_wide, mouth_round, mouth_lr)
+                draw_chin(img, face_cx, 700, jaw_open)
 
             draw_energy_bar(img, 60, 90, 180, 18, f["skin_energy"][i], "skin")
             draw_energy_bar(img, 60, 130, 180, 18, f["jaw_energy"][i], "jaw")
@@ -466,8 +498,11 @@ def main():
 
             cv2.putText(img, "A2F -> Robot expression preview", (40, 42), cv2.FONT_HERSHEY_SIMPLEX, 1.0, FG, 2, cv2.LINE_AA)
             cv2.putText(img, f"time: {t:0.2f}s / {duration:0.2f}s", (900, 42), cv2.FONT_HERSHEY_SIMPLEX, 0.7, FG, 2, cv2.LINE_AA)
-            cv2.putText(img, f"emotion: {emotion}", (900, 78), cv2.FONT_HERSHEY_SIMPLEX, 0.8, ACCENT, 2, cv2.LINE_AA)
-            cv2.putText(img, f"intensity: {intensity}", (900, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.8, ACCENT, 2, cv2.LINE_AA)
+            if args.blind_id:
+                cv2.putText(img, f"Trial {args.blind_id}", (900, 78), cv2.FONT_HERSHEY_SIMPLEX, 0.8, ACCENT, 2, cv2.LINE_AA)
+            else:
+                cv2.putText(img, f"emotion: {emotion}", (900, 78), cv2.FONT_HERSHEY_SIMPLEX, 0.8, ACCENT, 2, cv2.LINE_AA)
+                cv2.putText(img, f"intensity: {intensity}", (900, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.8, ACCENT, 2, cv2.LINE_AA)
 
             cv2.rectangle(img, (250, 80), (860, 150), (235, 235, 235), -1)
             cv2.rectangle(img, (250, 80), (860, 150), (210, 210, 210), 1)

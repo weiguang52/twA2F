@@ -26,6 +26,8 @@ class AudioChunk:
     bits_per_sample: int = 16
     emotion: Optional[str] = None
     intensity: Optional[float] = None
+    emotion_meta: Dict[str, str] = field(default_factory=dict)
+    emotion_mix: Optional[Dict[str, float]] = None
 
 
 @dataclass

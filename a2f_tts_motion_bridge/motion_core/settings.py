@@ -14,7 +14,19 @@ HOP = 1600
 NUM_FEATURES = 169
 EXPORT_FPS = 30.0
 
-EMOTION_LABELS = ["neutral", "angry", "disgust", "fear", "happy", "sad", "surprise"]
+# Claire 2.3 network_info.json order. Explicit block occupies absolute dims 16:26.
+EXPLICIT_EMOTION_LABELS = [
+    "amazement", "anger", "cheekiness", "disgust", "fear",
+    "grief", "joy", "outofbreath", "pain", "sadness",
+]
+EMOTION_LABELS = ["neutral", *EXPLICIT_EMOTION_LABELS]
+EMOTION_ALIASES = {
+    "happy": "joy", "smile": "joy", "laugh": "joy",
+    "sad": "sadness", "sorrow": "sadness",
+    "surprise": "amazement", "surprised": "amazement", "angry": "anger",
+    "out_of_breath": "outofbreath", "out-of-breath": "outofbreath",
+}
+EMOTION_BIAS_SCALE = 0.35
 
 # 8 four-bar vertical modules + 2D right mouth corner + 2D left mouth corner + direct jaw = 13.
 # Four-bar y and mouth x/y use neutral=0.5. Jaw uses closed/rest=0.0.

@@ -8,6 +8,8 @@ from .types import AudioChunk, MotorFrame, SessionConfig, SessionSummaryData
 from .a2f_stream_infer import A2FModelRuntime, StreamingA2FEngine
 from .motion_recorder import SessionRecorder
 from .arkit52_to_motor import OnlineRetargeter
+from .emotion_control import EmotionControl, canonical_emotion
+from .emotion_track import EmotionTrack
 
 
 def now_ms() -> int:
@@ -25,6 +27,7 @@ class MotorStreamSession:
     ):
         self.model_path = model_path
         self.config = config
+        self.emotion_control = EmotionControl(config.emotion, config.intensity).patch(config.extra)
         engine_started = time.perf_counter()
         self.engine = StreamingA2FEngine(
             model_path=model_path,
@@ -34,6 +37,9 @@ class MotorStreamSession:
             runtime=runtime,
         )
         self.engine_init_ms = (time.perf_counter() - engine_started) * 1000.0
+        self.emotion_track = EmotionTrack(getattr(self.engine.runtime, 'emotion_latent', None))
+        self.emotion_track.schedule(self.emotion_control, config.extra, 0.)
+        self.engine.emotion_provider = self.emotion_track.sample
         model_dir = model_path if os.path.isdir(model_path) else os.path.dirname(model_path)
         retarget_started = time.perf_counter()
         self.retargeter = OnlineRetargeter(model_dir=model_dir, calib_frames=20)
@@ -43,6 +49,8 @@ class MotorStreamSession:
             retarget_version=getattr(self.retargeter, "retarget_version", "unknown"),
             arkit_mapper="raw169_to_arkit52_hybrid",
             arkit_model_dir=model_dir,
+            **self.emotion_control.metadata(),
+            **self.emotion_track.metadata(),
         )
         self.motor_names = list(MOTOR_CFG.keys())
         self.frame_id = 0
@@ -55,11 +63,39 @@ class MotorStreamSession:
         self.npy_path = ""
 
     def update_emotion(self, emotion: str, intensity: float):
-        self.config.emotion = emotion or self.config.emotion
-        if intensity is not None:
-            self.config.intensity = float(intensity)
+        self.update_emotion_meta(dict(emotion=emotion or self.config.emotion,
+                                      intensity=self.config.intensity if intensity is None else intensity))
+
+    def update_emotion_meta(self, meta):
+        updated = self.emotion_control.patch(meta)
+        if hasattr(self, 'emotion_track'):
+            self.emotion_track.schedule(updated, meta, int(self.engine.total_received) / float(TARGET_SR))
+        # Both protocol and track validation finish before mutating session state.
+        self.emotion_control = updated
+        self.config.emotion = updated.emotion
+        self.config.intensity = updated.intensity
+        self.recorder.set_meta_extra(**updated.metadata())
+        if hasattr(self, 'emotion_track'):
+            self.recorder.set_meta_extra(**self.emotion_track.metadata())
 
     def process_chunk(self, chunk: AudioChunk) -> List[MotorFrame]:
+        changes = {}
+        if chunk.emotion is not None and canonical_emotion(chunk.emotion) != self.emotion_control.emotion:
+            changes['emotion'] = chunk.emotion
+        if chunk.intensity is not None:
+            changes['intensity'] = chunk.intensity
+        meta = dict(chunk.emotion_meta)
+        if chunk.emotion_mix is not None:
+            if 'emotion_mix' in meta:
+                raise ValueError('Specify AudioChunk.emotion_mix or meta emotion_mix, not both')
+            meta['emotion_mix'] = chunk.emotion_mix
+        control = self.emotion_control.patch(changes).patch(meta)
+        self.emotion_track.schedule(control, meta, int(self.engine.total_received) / float(TARGET_SR))
+        # Validate before adding any audio; a rejected update leaves no partial data.
+        self.emotion_control = control
+        self.config.emotion, self.config.intensity = control.emotion, control.intensity
+        self.recorder.set_meta_extra(**control.metadata())
+        self.recorder.set_meta_extra(**self.emotion_track.metadata())
         t0 = time.perf_counter()
         audio_16k = preprocess_stream_chunk_to_16k_mono(
             pcm_bytes=chunk.pcm_bytes,
@@ -76,9 +112,8 @@ class MotorStreamSession:
         if chunk.pts_ms >= 0:
             self.total_audio_ms = max(self.total_audio_ms, chunk.pts_ms)
 
-        emotion = chunk.emotion if chunk.emotion is not None else self.config.emotion
-        intensity = chunk.intensity if chunk.intensity is not None else self.config.intensity
-        infer_items = self.engine.push_audio_chunk(audio_16k, emotion, intensity)
+        emotion, intensity = control.emotion, control.intensity
+        infer_items = self.engine.push_audio_chunk(audio_16k, emotion, intensity, control=control)
 
         frames = []
         for item in infer_items:
@@ -90,6 +125,7 @@ class MotorStreamSession:
                 emotion=item_emotion,
                 intensity=item_intensity,
                 audio_rms=item.get("audio_rms"),
+                control=item.get("emotion_control"),
             )
             t3 = time.perf_counter()
             self.retarget_ms_total += (t3 - t2) * 1000.0
@@ -155,6 +191,7 @@ class MotorStreamSession:
                 emotion=item_emotion,
                 intensity=item_intensity,
                 audio_rms=item.get("audio_rms"),
+                control=item.get("emotion_control"),
             )
             t3 = time.perf_counter()
             self.retarget_ms_total += (t3 - t2) * 1000.0

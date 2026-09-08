@@ -18,6 +18,8 @@ class SessionRecorder:
         self.audio_16k_all = []
         self.audio_rms = []
         self.speech_gate = []
+        self.emotion_vectors = []
+        self.emotion_bias_scales = []
         self.meta_extra: Dict[str, object] = {}
 
     def set_meta_extra(self, **kwargs):
@@ -53,6 +55,8 @@ class SessionRecorder:
         self.motor_values.append([float(motors[k]) for k in self.motor_names])
         self.audio_rms.append(float(audio_rms) if audio_rms is not None else 0.0)
         debug_extra = debug_extra or {}
+        self.emotion_vectors.append(debug_extra.get('emotion_vector', [0.0] * 26))
+        self.emotion_bias_scales.append(float(debug_extra.get('emotion_bias_scale', 0.0)))
         self.speech_gate.append(float(debug_extra.get("speech_gate", 0.0)))
         if arkit52 is not None:
             if not self.arkit52_names:
@@ -139,6 +143,8 @@ class SessionRecorder:
             "motor_values_native": motor_values,
             "audio_rms_native": audio_rms,
             "speech_gate_native": speech_gate,
+            "emotion_vectors_native": np.asarray(self.emotion_vectors, dtype=np.float32).reshape(-1, 26),
+            "emotion_bias_scales_native": np.asarray(self.emotion_bias_scales, dtype=np.float32),
             "frame_times_30fps": frame_times_30,
             "weights_30fps": weights_30,
             "weights_30fps_3d": weights_30[:, None, :] if len(weights_30) > 0 else np.zeros((0, 1, NUM_FEATURES), dtype=np.float32),

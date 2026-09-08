@@ -1,5 +1,9 @@
 # Retarget fix package
 
+P16 continuous emotion library, envelopes and per-chunk mixtures: [EMOTION_PROTOCOL_P16.md](EMOTION_PROTOCOL_P16.md).
+
+Current P06 emotion protocol and regression guide: [EMOTION_PROTOCOL_P06.md](EMOTION_PROTOCOL_P06.md). The notes below describe the earlier retarget fix.
+
 ## Why this fix
 Your metrics strongly suggest the main problem is in retargeting, not in the raw 169-d output:
 

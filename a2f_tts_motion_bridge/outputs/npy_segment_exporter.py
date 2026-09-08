@@ -220,6 +220,8 @@ def build_payload_from_recorder(
         "motor_values_native": motor_values,
         "audio_rms_native": audio_rms,
         "speech_gate_native": speech_gate,
+        "emotion_vectors_native": np.asarray(recorder.emotion_vectors, dtype=np.float32).reshape(-1, 26)[mask],
+        "emotion_bias_scales_native": np.asarray(recorder.emotion_bias_scales, dtype=np.float32)[mask],
         "frame_times_30fps": frame_times_30,
         "weights_30fps": weights_30,
         "weights_30fps_3d": weights_30[:, None, :] if len(weights_30) > 0 else np.zeros((0, 1, NUM_FEATURES), dtype=np.float32),

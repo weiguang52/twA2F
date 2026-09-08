@@ -1,5 +1,7 @@
 # VoiceAgent 联调说明
 
+P06 情绪参数更新：支持 10 种原生情绪、10 维显式权重和 16 维隐向量；meta 字段、覆盖/清空规则及回归流程见 [EMOTION_PROTOCOL_P06.md](EMOTION_PROTOCOL_P06.md)。
+
 ## 你现在有两条并行接口
 
 ### 1. 原生实时 motor stream（保留原能力）
@@ -75,7 +77,7 @@ meta = {
 说明：
 - `emotion`：当前 chunk 对应的目标情绪
 - `intensity`：当前 chunk 对应的情绪强度
-- 表情段固定为 640 ms（首段也为 640 ms）；`segment_ms` 和 `first_segment_ms` 旧字段即使传入其他值也不会改变该时长
+- 默认首段为 0–320 ms，第二段为 320–640 ms，此后按 640 ms 分段。服务端 `--segment_ms` 配置常规周期，`--first_segment_ms` 配置首段；请求 meta 的 `segment_ms` 不覆盖服务端周期，正整数 `first_segment_ms` 可覆盖首段（最大不超过常规周期）。
 - 如果情绪中途切换，后续 chunk 改这个 meta 即可
 - 兼容服务会按 chunk 读取最新 emotion/intensity
 

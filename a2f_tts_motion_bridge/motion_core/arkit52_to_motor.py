@@ -23,6 +23,8 @@ from __future__ import annotations
 from typing import Dict, Optional
 
 import numpy as np
+from .emotion_control import EmotionControl, canonical_emotion
+from .settings import EXPLICIT_EMOTION_LABELS, EMOTION_BIAS_SCALE
 
 try:
     from .a2f169_to_arkit52 import A2F169ToARKit52
@@ -30,7 +32,7 @@ except ImportError:  # pragma: no cover
     from data.a2f.a2f_tts_motion_bridge.motion_core.a2f169_to_arkit52 import A2F169ToARKit52
 
 
-RETARGET_VERSION = "current_head_arkit52_to_norm_dof_v2_13dof"
+RETARGET_VERSION = "current_head_arkit52_to_norm_dof_v3_p06_10emotion"
 
 # Current logical DOFs for the new head mechanism.
 # 8 four-bar vertical modules + 2D right mouth corner + 2D left mouth corner + direct jaw = 13.
@@ -154,7 +156,7 @@ def _emotion_bias(emotion: str, intensity: float) -> Dict[str, float]:
     These biases are intentionally conservative. They change only logical targets,
     not final hardware angles.
     """
-    e = (emotion or "neutral").lower().strip()
+    e = canonical_emotion(emotion)
     s = clip(float(intensity), 0.0, 1.5)
     z = {name: 0.0 for name in CURRENT_HEAD_DOF_NAMES}
 
@@ -168,7 +170,7 @@ def _emotion_bias(emotion: str, intensity: float) -> Dict[str, float]:
         z["right_lower_lid_y"] += 0.08 * s
         z["left_outer_brow_y"] += 0.04 * s
         z["right_outer_brow_y"] += 0.04 * s
-    elif e in {"sad", "sorrow"}:
+    elif e == "sadness":
         # Mouth corners down/in, inner brows raised, outer brows slightly low.
         z["left_mouth_x"] -= 0.06 * s
         z["right_mouth_x"] -= 0.06 * s
@@ -192,7 +194,7 @@ def _emotion_bias(emotion: str, intensity: float) -> Dict[str, float]:
         z["right_mouth_x"] -= 0.04 * s
         z["left_mouth_y"] -= 0.06 * s
         z["right_mouth_y"] -= 0.06 * s
-    elif e in {"surprise", "surprised"}:
+    elif e == "amazement":
         # Brows up, upper lids up/open, jaw open bias, corners slightly outward.
         for k in ["left_inner_brow_y", "right_inner_brow_y", "left_outer_brow_y", "right_outer_brow_y"]:
             z[k] += 0.16 * s
@@ -203,6 +205,48 @@ def _emotion_bias(emotion: str, intensity: float) -> Dict[str, float]:
         z["left_mouth_x"] += 0.06 * s
         z["right_mouth_x"] += 0.06 * s
         z["jaw_y"] += 0.15 * s
+    elif e == "disgust":
+        for side in ('left', 'right'):
+            z[f'{side}_inner_brow_y'] = -0.14 * s
+            z[f'{side}_upper_lid_y'] = -0.09 * s
+            z[f'{side}_lower_lid_y'] = 0.13 * s
+            z[f'{side}_mouth_y'] = -0.12 * s
+    elif e == "fear":
+        for side in ('left', 'right'):
+            z[f'{side}_inner_brow_y'] = 0.17 * s
+            z[f'{side}_outer_brow_y'] = 0.22 * s
+            z[f'{side}_upper_lid_y'] = 0.24 * s
+            z[f'{side}_lower_lid_y'] = -0.06 * s
+            z[f'{side}_mouth_x'] = 0.18 * s
+            z[f'{side}_mouth_y'] = -0.05 * s
+        z['jaw_y'] = 0.09 * s
+    elif e == "cheekiness":
+        z.update(left_mouth_x=0.14*s, left_mouth_y=0.18*s,
+                 right_mouth_x=0.03*s, right_mouth_y=0.04*s,
+                 left_outer_brow_y=0.12*s, right_upper_lid_y=-0.09*s,
+                 right_lower_lid_y=0.08*s)
+    elif e == "grief":
+        for side in ('left', 'right'):
+            z[f'{side}_inner_brow_y'] = 0.22 * s
+            z[f'{side}_outer_brow_y'] = -0.12 * s
+            z[f'{side}_upper_lid_y'] = -0.12 * s
+            z[f'{side}_lower_lid_y'] = 0.10 * s
+            z[f'{side}_mouth_y'] = -0.24 * s
+        z['jaw_y'] = 0.05 * s
+    elif e == "pain":
+        for side in ('left', 'right'):
+            z[f'{side}_inner_brow_y'] = -0.14 * s
+            z[f'{side}_upper_lid_y'] = -0.24 * s
+            z[f'{side}_lower_lid_y'] = 0.20 * s
+            z[f'{side}_mouth_x'] = 0.12 * s
+            z[f'{side}_mouth_y'] = -0.11 * s
+        z['jaw_y'] = 0.10 * s
+    elif e == "outofbreath":
+        z['jaw_y'] = 0.20 * s
+        for side in ('left', 'right'):
+            z[f'{side}_upper_lid_y'] = -0.06 * s
+            z[f'{side}_inner_brow_y'] = 0.06 * s
+            z[f'{side}_mouth_x'] = -0.08 * s
     return z
 
 
@@ -211,6 +255,8 @@ def arkit52_to_current_head_dofs(
     speech_gate: float = 1.0,
     emotion: str = "neutral",
     intensity: float = 1.0,
+    control: Optional[EmotionControl] = None,
+    bias_scale: float = EMOTION_BIAS_SCALE,
 ) -> Dict[str, float]:
     """Stateless ARKit52 -> current normalized mechanism DOFs.
 
@@ -297,9 +343,21 @@ def arkit52_to_current_head_dofs(
     }
 
     # Add conservative emotion-space offsets after ARKit mapping.
-    bias = _emotion_bias(emotion, intensity)
+    control = control or EmotionControl(emotion, intensity, bias_scale=bias_scale)
+    bias = {k: 0.0 for k in CURRENT_HEAD_DOF_NAMES}
+    for label, weight in zip(EXPLICIT_EMOTION_LABELS, control.explicit()):
+        if weight:
+            offsets = _emotion_bias(label, float(weight))
+            for k in bias:
+                bias[k] += offsets[k]
     for k in CURRENT_HEAD_DOF_NAMES:
-        dofs[k] = clip(dofs[k] + bias.get(k, 0.0))
+        base, offset = dofs[k], bias[k] * control.bias_scale
+        neutral = MOTOR_CFG[k]['neutral']
+        # Never reverse a model-driven displacement with a hand-authored offset.
+        if (base - neutral) * offset < 0:
+            offset = 0.0
+        headroom = (1.0 - base) if offset > 0 else base
+        dofs[k] = clip(base + offset * headroom)
     return dofs
 
 
@@ -373,7 +431,9 @@ class OnlineRetargeter:
         self.last_blendshapes = bs
         return bs
 
-    def update(self, w169, emotion: str = "neutral", intensity: float = 1.0, audio_rms: Optional[float] = None):
+    def update(self, w169, emotion: str = "neutral", intensity: float = 1.0,
+               audio_rms: Optional[float] = None, control: Optional[EmotionControl] = None):
+        control = control or EmotionControl(emotion, intensity)
         bs = self.project_blendshapes(w169, audio_rms=audio_rms)
         speech_gate = self.speech_gate.update(
             audio_rms,
@@ -384,6 +444,7 @@ class OnlineRetargeter:
             speech_gate=speech_gate,
             emotion=emotion,
             intensity=intensity,
+            control=control,
         )
         dofs = self._smooth_dofs(raw_dofs)
         feats = debug_features_from_arkit52(bs, dofs, speech_gate)
@@ -392,6 +453,7 @@ class OnlineRetargeter:
             "arkit_jawOpen": _get(bs, "jawOpen"),
             "arkit_mouthClose": _get(bs, "mouthClose"),
             "retarget_version": RETARGET_VERSION,
+            **control.metadata(),
         }
         feats_out = {
             "jaw_open": feats["jaw_open"],

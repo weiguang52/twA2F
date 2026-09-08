@@ -101,7 +101,7 @@ class VoiceAgentCompat(vapb2_grpc.VoiceAgentServicer):
         meta = dict(first_req.meta)
         session_id = first_req.session_id or meta.get("session_id") or f"va-{uuid.uuid4().hex[:12]}"
         emotion = meta.get("emotion", "neutral")
-        intensity = _parse_float(meta.get("intensity"), 1.0)
+        intensity = float(meta.get("intensity", 1.0))
         output_fps = _parse_float(meta.get("output_fps"), self.default_output_fps)
         save_server_npy = _parse_bool(meta.get("save_server_npy"), False)
         save_server_npy_dir = meta.get("save_server_npy_dir", self.default_save_dir)
@@ -189,15 +189,12 @@ class VoiceAgentCompat(vapb2_grpc.VoiceAgentServicer):
         state: Dict[str, object],
     ) -> None:
         meta = dict(req.meta)
-        emotion = meta.get("emotion")
-        intensity = _parse_float(meta.get("intensity"), float(state["intensity"])) if "intensity" in meta else None
-        if emotion is not None or intensity is not None:
-            session.update_emotion(emotion or session.config.emotion, intensity if intensity is not None else session.config.intensity)
-            exporter.update_emotion(emotion, intensity)
-            if emotion is not None:
-                state["emotion"] = emotion
-            if intensity is not None:
-                state["intensity"] = float(intensity)
+        # Validates P06 vectors plus P16 JSON mixtures/VA, latent and timing options
+        # atomically, scheduled at the next chunk's sample-clock boundary.
+        session.update_emotion_meta(meta)
+        exporter.update_emotion(session.config.emotion, session.config.intensity)
+        state['emotion'] = session.config.emotion
+        state['intensity'] = session.config.intensity
         if req.sample_rate:
             state["sample_rate"] = int(req.sample_rate)
         if req.channels:

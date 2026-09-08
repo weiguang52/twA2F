@@ -1,8 +1,8 @@
 import argparse
 
-from data.a2f.a2f_tts_motion_bridge.motion_core.audio_stream import MockStreamConfig, iter_mock_tts_stream_from_wav
-from data.a2f.a2f_tts_motion_bridge.motion_core.types import SessionConfig
-from data.a2f.a2f_tts_motion_bridge.motion_core.motion_session import MotorStreamSession
+from ..motion_core.audio_stream import MockStreamConfig, iter_mock_tts_stream_from_wav
+from ..motion_core.types import SessionConfig
+from ..motion_core.motion_session import MotorStreamSession
 
 
 def main():
