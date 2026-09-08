@@ -1,0 +1,15 @@
+{
+    "estimated_trt_builder_time": 150,
+    "trt_build_param": {
+        "cuda_in_graphics": ["--memPoolSize=tacticSharedMem:0.046875"],
+        "batch": [
+            "--minShapes=input:1x1x8320,emotion:1x1x26",
+            "--maxShapes=input:{MAX_BATCH_SIZE}x1x8320,emotion:{MAX_BATCH_SIZE}x1x26",
+            "--optShapes=input:{OPT_BATCH_SIZE}x1x8320,emotion:{OPT_BATCH_SIZE}x1x26"
+            ]
+    },
+    "defaults": {
+        "MAX_BATCH_SIZE": 128,
+        "OPT_BATCH_SIZE": 8
+    }
+}

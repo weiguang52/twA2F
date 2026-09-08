@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A2F 表情实验室 · NPY 查看器</title>
+<style>
+:root{color-scheme:dark;--bg:#101619;--panel:#182125;--line:#314048;--text:#eef4f6;--muted:#a5b5bd;--mint:#96e8c8;--blue:#80baf0}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,"Microsoft YaHei",sans-serif}main{max-width:1440px;margin:auto;padding:26px}header{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:24px}.brand small{color:var(--mint);letter-spacing:.18em;font-size:12px}.brand h1{font-size:25px;letter-spacing:.02em;margin:4px 0;font-weight:600}.local{color:var(--muted);font-size:14px}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--mint);margin-right:8px}.grid{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:18px}.panel{border:1px solid var(--line);border-radius:16px;background:var(--panel);overflow:hidden}.stage-head{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}.stage-head h2{font-size:16px;margin:0;font-weight:500}.pill{border:1px solid #44645a;color:var(--mint);padding:3px 10px;border-radius:20px;font-size:13px}.canvas-wrap{position:relative;background:#121c22}.canvas-wrap canvas{display:block;width:100%;height:auto;aspect-ratio:1.52}.caption{position:absolute;left:20px;bottom:12px;color:#a5b8c4;font-size:12px;pointer-events:none}.controls{padding:18px 20px;border-top:1px solid var(--line)}button,select,.choose{font:inherit;min-height:40px;border:1px solid var(--line);border-radius:8px;color:var(--text);background:#233038;padding:8px 14px;cursor:pointer}button:hover,.choose:hover{border-color:var(--mint)}button:disabled{opacity:.4;cursor:not-allowed}button.primary,.choose{background:var(--mint);border-color:var(--mint);color:#10271f;font-weight:600}button:focus-visible,select:focus-visible,input:focus-visible,.choose:focus-within{outline:3px solid var(--blue);outline-offset:3px}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.row.between{justify-content:space-between}.clock{font:14px ui-monospace,monospace;font-variant-numeric:tabular-nums;color:var(--muted)}input[type=range]{accent-color:var(--mint);width:100%;cursor:pointer}input[type=checkbox]{accent-color:var(--mint);width:16px;height:16px;vertical-align:middle}.seek{margin:14px 0 8px}.wave{width:100%;height:62px;display:block}.minor{font-size:14px;color:var(--muted)}.checks{margin-top:14px;gap:18px}.checks label{font-size:14px}.side{display:flex;flex-direction:column;gap:16px}.drop{padding:20px;border:1px dashed #628073;border-radius:14px;background:#1a2c27}.drop.drag{background:#29463a;border-color:var(--mint)}.drop strong{display:block;font-weight:500;margin-bottom:6px}.drop p{margin:0 0 16px;font-size:14px;color:var(--muted)}.choose{display:inline-flex;align-items:center;position:relative}.choose input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}.files{margin-top:12px;display:flex;flex-direction:column;gap:5px}.filebtn{text-align:left;width:100%;font-size:13px;font-weight:400;overflow-wrap:anywhere;background:transparent;padding:8px;min-height:36px}.filebtn.active{background:#2b4439;border-color:var(--mint)}.data{padding:18px}.data h2{margin:0 0 14px;font-size:16px;font-weight:500}.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 12px;font-size:14px}.kv dt{color:var(--muted)}.kv dd{margin:0;text-align:right;overflow-wrap:anywhere}.channels{margin-top:16px}.channel{display:grid;grid-template-columns:103px 1fr 42px;gap:8px;align-items:center;margin:8px 0;font-size:12px}.channel output{text-align:right;font:12px ui-monospace,monospace}.track{height:5px;background:#36434a;border-radius:3px;position:relative}.track:after{content:"";position:absolute;left:50%;top:-3px;height:11px;width:1px;background:#76858c}.fill{height:100%;background:var(--mint);border-radius:3px;max-width:100%}.status{margin:16px 0 0;color:var(--muted);font-size:14px;min-height:22px;overflow-wrap:anywhere}.status.error{color:#ffad9f}.foot{font-size:13px;color:var(--muted);margin:18px 0 0;max-width:1000px}.sub{margin-top:16px;padding:16px 20px}.sub summary{cursor:pointer;font-size:14px;color:var(--muted)}.sub p{font-size:14px;color:var(--muted)}.raw-rate{margin-top:14px}.raw-rate input{width:80px;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);padding:6px;border-radius:5px}[hidden]{display:none!important}@media(max-width:940px){.grid{grid-template-columns:minmax(0,1fr) 275px}main{padding:16px}.channel{grid-template-columns:88px 1fr 38px;gap:5px}}@media(max-width:720px){.grid{display:flex;flex-direction:column}.side{display:contents}.drop{order:-1}.stage{order:0}.data{order:1}header{align-items:flex-start;flex-direction:column;gap:4px;margin-bottom:16px}.brand h1{font-size:22px}main{padding:12px}.canvas-wrap canvas{aspect-ratio:1.1}.controls{padding:14px}.stage-head{padding:12px 14px}.caption{font-size:11px;left:12px}.local{font-size:13px}.files{max-height:180px;overflow:auto}.row{gap:8px}.channels{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}.channel{grid-template-columns:90px 1fr 35px}}@media(max-width:440px){.channels{display:block}.clock{width:100%;text-align:left}.caption{max-width:85%}}
+.canvas-wrap canvas{aspect-ratio:1000 / 660}
+</style>
+</head>
+<body><main>
+<header><div class="brand"><small>AUDIO → FACE / MOTION INSPECTOR</small><h1>A2F 表情实验室</h1></div><div class="local"><span class="dot"></span>离线读取 · 文件留在你的浏览器中</div></header>
+<div class="grid">
+<section class="panel stage"><div class="stage-head"><h2 id="title">等待导入表情文件</h2><span class="pill" id="badge">13 DOF</span></div>
+<div class="canvas-wrap"><canvas id="face" width="1000" height="660" aria-label="机器人13自由度表情正面示意，右侧为逐通道数值">面部动作预览</canvas><div class="caption">正面视角 · 画面左侧是机器人的右侧</div></div>
+<div class="controls"><div class="row between"><div class="row"><button class="primary" id="play" disabled>播放</button><button id="prev" disabled aria-label="上一帧">−1 帧</button><button id="next" disabled aria-label="下一帧">+1 帧</button><label class="minor">速度 <select id="speed" aria-label="播放速度"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label></div><output class="clock" id="clock">00:00.000 / 00:00.000</output></div>
+<input class="seek" id="seek" type="range" min="0" max="1" step="0.001" value="0" disabled aria-label="播放时间轴"><canvas class="wave" id="wave" width="1000" height="62" aria-label="音频波形和当前播放位置"></canvas>
+<div class="row checks"><label><input id="loop" type="checkbox" checked> 循环播放</label><label><input id="sound" type="checkbox" checked> 播放音频</label><label><input id="neutral" type="checkbox" checked> 中性轮廓对照</label><output class="minor" id="frame">帧 —</output></div></div></section>
+<aside class="side"><div class="drop" id="drop"><strong>拖入你的 .npy 文件</strong><p>支持本项目的30 / 90 Hz字典文件，可一次选择多个表情。</p><label class="choose">选择 NPY 文件<input id="files" type="file" accept=".npy" multiple aria-label="选择一个或多个NPY文件"></label><div class="files" id="list"></div><label class="minor raw-rate" id="rawRate" hidden>纯数组采样率 <input id="fpsInput" type="number" min="1" max="1000" value="90"> Hz</label></div>
+<section class="panel data"><h2>动作数据</h2><dl class="kv"><dt>采样频率</dt><dd id="fps">—</dd><dt>帧数 / 通道</dt><dd id="shape">—</dd><dt>情绪 / 强度</dt><dd id="emotion">—</dd><dt>音频</dt><dd id="audioInfo">—</dd><dt>当前数据</dt><dd id="field">—</dd></dl><div class="channels" id="channels"></div></section></aside>
+</div>
+<p class="status" id="status" role="status" aria-live="polite">选择文件后即可播放，空格暂停 / 继续，方向键逐帧查看。</p>
+<details class="panel sub"><summary>预览范围与文件格式</summary><p>面部示意直接由13维 motor_values 驱动，支持左右眉毛、上下眼睑、左右嘴角和下巴。它用于观察动作趋势、左右对称与音画同步，不是机器人皮肤或真人面部的物理仿真。页面不会根据文件名或情绪标签添加任何额外表情。</p><p>90 Hz表示数据采样频率，播放按真实时间定位，屏幕实际刷新率由设备决定。优先读取 *_90hz，再读取 *_30fps 和 *_native；历史字段名中的“30fps”不决定实际频率。纯 [帧数,13] 数组默认90 Hz，可手动调整。音频缺失时仍能播放动作。</p><p>NPY字典使用受限的 NumPy 数据解析器读取；不执行 Python、任意函数或网络请求。不支持的对象类型会明确报错。单文件大小上限200 MiB。</p></details>
+</main>
+<script id="npy-core">
+/* Restricted NPY / NumPy pickle data decoder. Never executes pickle callables. */
+const A2F = (() => {
+const NAMES=['right_outer_brow_y','left_inner_brow_y','right_inner_brow_y','left_outer_brow_y','right_upper_lid_y','left_upper_lid_y','right_lower_lid_y','left_lower_lid_y','right_mouth_x','right_mouth_y','left_mouth_x','left_mouth_y','jaw_y'];
+const LABELS=['右外眉','左内眉','右内眉','左外眉','右上眼睑','左上眼睑','右下眼睑','左下眼睑','右嘴角 · 外展','右嘴角 · 上扬','左嘴角 · 外展','左嘴角 · 上扬','下巴 · 张开'];
+const td=new TextDecoder();
+function fail(s){throw Error(s)}
+function numeric(raw,shape,dtype,fortran=false){
+ if(!(raw instanceof Uint8Array))fail('数组缺少二进制数据');
+ let match=/^([<>=|]?)([fiuOb?])(\d*)$/.exec(dtype); if(!match)fail('不支持的数据类型 '+dtype);
+ let [,endian,kind,num]=match,size=Number(num||1); if(kind==='O')fail('对象数组只能通过受限字典解析');
+ let count=shape.reduce((a,b)=>a*b,1);if(!Number.isSafeInteger(count)||count<0||count>30000000)fail('数组尺寸过大或无效');
+ if(raw.length!==count*size)fail('数组字节数与形状不一致');
+ let dv=new DataView(raw.buffer,raw.byteOffset,raw.byteLength),le=endian!=='>';
+ let data=new Float64Array(count);const readers={f4:'getFloat32',f8:'getFloat64',i1:'getInt8',i2:'getInt16',i4:'getInt32',u1:'getUint8',u2:'getUint16',u4:'getUint32',b1:'getUint8','?1':'getUint8'};let method=readers[kind+size];
+ if(!method)fail('暂不支持数值类型 '+dtype);for(let i=0;i<count;i++)data[i]=dv[method](i*size,le);
+ if(fortran&&shape.length>1){let reordered=new Float64Array(count);for(let i=0;i<count;i++){let rem=i,j=0,stride=1;for(let d=shape.length-1;d>=0;d--){let coord=rem%shape[d];rem=Math.floor(rem/shape[d]);let fstride=1;for(let k=0;k<d;k++)fstride*=shape[k];j+=coord*fstride}reordered[i]=data[j]}data=reordered}
+ return {kind:'array',shape,data};
+}
+function unpickle(raw){
+ let pos=0,stack=[],memo=[],mark=Symbol('mark'),steps=0;
+ const need=n=>{if(!Number.isSafeInteger(n)||n<0||pos+n>raw.length)fail('NPY数据被截断')};
+ const take=n=>{need(n);let a=raw.subarray(pos,pos+n);pos+=n;return a};
+ const byte=()=>{need(1);return raw[pos++]};
+ const uint=n=>{let a=take(n),v=0;for(let i=n-1;i>=0;i--)v=v*256+a[i];if(!Number.isSafeInteger(v))fail('长度超出范围');return v};
+ const line=()=>{let start=pos;while(pos<raw.length&&raw[pos]!==10)pos++;if(pos===raw.length)fail('损坏的pickle文本');let r=td.decode(raw.subarray(start,pos));pos++;return r};
+ const pop=()=>{if(!stack.length)fail('pickle栈为空');return stack.pop()};
+ const items=()=>{let i=stack.lastIndexOf(mark);if(i<0)fail('损坏的pickle标记');let a=stack.splice(i);return a.slice(1)};
+ const global=(m,n)=>{let allowed=['numpy.ndarray','numpy.dtype','numpy.core.multiarray._reconstruct','numpy._core.multiarray._reconstruct','numpy.core.multiarray.scalar','numpy._core.multiarray.scalar','numpy.core.numeric._frombuffer','numpy._core.numeric._frombuffer'];let name=m+'.'+n;if(!allowed.includes(name))fail('不支持的对象类型：'+name);return {kind:'global',name}};
+ const dtypeString=d=>{if(!d||d.kind!=='dtype')fail('无效的NumPy dtype');return /^[<>=|]/.test(d.code)?d.code:(d.endian||'<')+d.code};
+ const reduce=(g,a)=>{if(g?.kind!=='global'||!Array.isArray(a))fail('不支持的pickle构造');if(g.name==='numpy.dtype')return {kind:'dtype',code:a[0]};if(g.name.endsWith('._reconstruct'))return {kind:'array'};if(g.name.endsWith('._frombuffer'))return numeric(a[0],a[2],dtypeString(a[1]),a[3]==='F');if(g.name.endsWith('.scalar'))return numeric(a[1],[],dtypeString(a[0])).data[0];fail('禁止执行对象构造：'+g.name)};
+ const set=(d,k,v)=>{if(!d||Object.getPrototypeOf(d)!==null||typeof k!=='string')fail('只支持字符串键的字典');d[k]=v};
+ while(pos<raw.length){if(++steps>1000000)fail('文件对象过多');let op=byte(),a,b,c;switch(op){
+ case 0x80:if(byte()>5)fail('不支持的pickle版本');break;case 0x95:uint(8);break;
+ case 0x2e:{let out=pop();return out?.kind==='array'&&out.object?out.object[0]:out}
+ case 0x28:stack.push(mark);break;case 0x4e:stack.push(null);break;case 0x88:stack.push(true);break;case 0x89:stack.push(false);break;
+ case 0x4b:stack.push(byte());break;case 0x4d:stack.push(uint(2));break;case 0x4a:a=take(4);stack.push(new DataView(a.buffer,a.byteOffset,4).getInt32(0,true));break;
+ case 0x47:a=take(8);stack.push(new DataView(a.buffer,a.byteOffset,8).getFloat64(0,false));break;
+ case 0x8a:{a=take(byte());let n=0;for(let i=a.length-1;i>=0;i--)n=n*256+a[i];if(a.length&&a[a.length-1]&128)n-=2**(8*a.length);if(!Number.isSafeInteger(n))fail('整数超出安全范围');stack.push(n);break}
+ case 0x8c:stack.push(td.decode(take(byte())));break;case 0x58:stack.push(td.decode(take(uint(4))));break;case 0x8d:stack.push(td.decode(take(uint(8))));break;
+ case 0x43:stack.push(take(byte()));break;case 0x42:stack.push(take(uint(4)));break;case 0x8e:case 0x96:stack.push(take(uint(8)));break;
+ case 0x63:a=line();b=line();stack.push(global(a,b));break;case 0x93:b=pop();a=pop();stack.push(global(a,b));break;
+ case 0x94:memo.push(stack[stack.length-1]);break;case 0x71:memo[byte()]=stack[stack.length-1];break;case 0x72:memo[uint(4)]=stack[stack.length-1];break;
+ case 0x68:a=byte();if(!(a in memo))fail('无效memo');stack.push(memo[a]);break;case 0x6a:a=uint(4);if(!(a in memo))fail('无效memo');stack.push(memo[a]);break;
+ case 0x29:case 0x5d:stack.push([]);break;case 0x7d:stack.push(Object.create(null));break;
+ case 0x85:stack.push([pop()]);break;case 0x86:b=pop();a=pop();stack.push([a,b]);break;case 0x87:c=pop();b=pop();a=pop();stack.push([a,b,c]);break;
+ case 0x74:case 0x6c:stack.push(items());break;case 0x61:a=pop();b=stack[stack.length-1];if(!Array.isArray(b))fail('无效列表');b.push(a);break;
+ case 0x65:a=items();b=stack[stack.length-1];if(!Array.isArray(b))fail('无效列表');for(const v of a)b.push(v);break;
+ case 0x73:c=pop();b=pop();set(stack[stack.length-1],b,c);break;case 0x75:a=items();b=stack[stack.length-1];if(a.length%2)fail('无效字典');for(let i=0;i<a.length;i+=2)set(b,a[i],a[i+1]);break;
+ case 0x52:b=pop();a=pop();stack.push(reduce(a,b));break;
+ case 0x62:b=pop();a=stack[stack.length-1];if(a?.kind==='dtype'){a.endian=b[1]}else if(a?.kind==='array'){
+  let [,shape,dtype,fortran,data]=b;if(!Array.isArray(shape))fail('无效数组形状');
+  if(dtype.code.startsWith('O')||dtype.code.includes('O')){if(!Array.isArray(data))fail('无效对象数组');a.shape=shape;a.object=data}else Object.assign(a,numeric(data,shape,dtypeString(dtype),fortran));
+ }else fail('不支持的pickle状态');break;
+ default:fail('不支持的NPY对象编码 0x'+op.toString(16));}
+ }fail('NPY缺少结束标记');
+}
+function parse(buffer){let raw=buffer instanceof Uint8Array?buffer:new Uint8Array(buffer);if(raw.length<10||raw[0]!==147||td.decode(raw.subarray(1,6))!=='NUMPY')fail('这不是有效的 .npy 文件');let v=raw[6];if(![1,2,3].includes(v))fail('不支持的NPY版本');let start=v===1?10:12;if(raw.length<start)fail('NPY头被截断');let n=new DataView(raw.buffer,raw.byteOffset,raw.byteLength)[v===1?'getUint16':'getUint32'](8,true);if(start+n>raw.length)fail('NPY头被截断');let header=td.decode(raw.subarray(start,start+n));let dtype=/'descr'\s*:\s*['"]([^'"]+)['"]/.exec(header)?.[1];let s=/'shape'\s*:\s*\(([^)]*)\)/.exec(header)?.[1];if(!dtype||s===undefined)fail('不支持的NPY头');let shape=s.split(',').map(x=>x.trim()).filter(Boolean).map(Number);if(shape.some(x=>!Number.isSafeInteger(x)||x<0))fail('无效NPY形状');let bytes=raw.subarray(start+n);return dtype.includes('O')?unpickle(bytes):numeric(bytes,shape,dtype,/'fortran_order'\s*:\s*True/.test(header))}
+function prepare(payload,rawFps=90){
+ const pure=payload?.kind==='array';let meta=pure?{}:(payload.meta||{}),motors,times,key;
+ if(pure){motors=payload;key='纯13维数组'}else{for(const suffix of ['90hz','30fps','native']){let m=payload['motor_values_'+suffix],t=payload['frame_times_'+suffix];if(m?.kind==='array'&&m.shape[0]>0){motors=m;times=t;key='motor_values_'+suffix;break}}}
+ if(!motors||motors.shape.length!==2||motors.shape[1]!==13||!motors.shape[0])fail('需要非空的 [帧数,13] motor_values 数组');
+ const n=motors.shape[0],names=meta.motor_names||NAMES;if(!Array.isArray(names)||names.length!==13||new Set(names).size!==13||NAMES.some(x=>!names.includes(x)))fail('motor_names 与本项目13个自由度不匹配');
+ let order=NAMES.map(x=>names.indexOf(x)),values=new Float64Array(n*13),outOfRange=0;
+ for(let f=0;f<n;f++)for(let j=0;j<13;j++){let v=motors.data[f*13+order[j]];if(!Number.isFinite(v))fail('动作数组含 NaN 或 Infinity');values[f*13+j]=v;if(v<0||v>1)outOfRange++}
+ let t;if(times){if(times.kind!=='array'||times.shape.length!==1||times.data.length!==n)fail('时间轴与动作帧数不一致');t=times.data}else{let fps=Number(pure?rawFps:meta.export_fps);if(!(fps>0&&fps<=1000))fail('缺少时间轴或有效采样率');t=Float64Array.from({length:n},(_,i)=>i/fps)}
+ for(let i=0;i<n;i++)if(!Number.isFinite(t[i])||(i>0&&t[i]<=t[i-1]))fail('时间轴必须有限且严格递增');
+ let intervals=Array.from(t.slice(1),(x,i)=>x-t[i]).sort((a,b)=>a-b),dt=intervals.length?intervals[Math.floor(intervals.length/2)]:1/(Number(meta.export_fps)||rawFps);
+ let rate=Number(meta.target_sr)||16000,audio=payload.audio_16k_mono?.data||null;if(audio){if(!(rate>=3000&&rate<=384000))fail('无效音频采样率');for(const v of audio)if(!Number.isFinite(v))fail('音频含非有限值')}
+ const origin=Number.isFinite(Number(meta.segment_start_ms))?Number(meta.segment_start_ms)/1000:0;
+ const relative=Float64Array.from(t,x=>x-origin);if(relative[0]<-0.001)fail('分段时间轴早于起始时间');
+ let duration=Math.max(relative[n-1]+dt,audio?audio.length/rate:0);
+ return {values,times:relative,n,fps:1/dt,dt,meta,key,pure,audio,rate,duration,origin,outOfRange};
+}
+function sample(d,t){let lo=0,hi=d.n-1;while(lo<hi){let mid=Math.ceil((lo+hi)/2);if(d.times[mid]<=t)lo=mid;else hi=mid-1}let index=lo,next=Math.min(index+1,d.n-1),alpha=next===index?0:Math.max(0,Math.min(1,(t-d.times[index])/(d.times[next]-d.times[index])));let values=NAMES.map((_,i)=>d.values[index*13+i]*(1-alpha)+d.values[next*13+i]*alpha);return {index,values}}
+return {parse,prepare,sample,NAMES,LABELS};
+})();
+</script>
+<script id="viewer-ui">
+(()=>{'use strict';
+const $=id=>document.getElementById(id),face=$('face'),ctx=face.getContext('2d'),wave=$('wave'),wc=wave.getContext('2d');
+let data=null,files=[],currentFile=null,time=0,playing=false,last=0,rate=1,context=null,source=null,audioBuffer=null,loadToken=0,audioEpoch=0,peaks=[],bars=[];
+const neutral=A2F.NAMES.map(n=>n==='jaw_y'?0:.5),clamp=x=>Math.max(0,Math.min(1,x));
+for(let i=0;i<13;i++){let row=document.createElement('div');row.className='channel';let label=document.createElement('span');label.textContent=A2F.LABELS[i];label.title=A2F.NAMES[i];let track=document.createElement('div');track.className='track';let fill=document.createElement('div');fill.className='fill';track.append(fill);let output=document.createElement('output');row.append(label,track,output);$('channels').append(row);bars.push({fill,output})}
+function message(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error)}
+function clock(t){let m=Math.floor(t/60);return String(m).padStart(2,'0')+':'+(t%60).toFixed(3).padStart(6,'0')}
+function path(coords,stroke,width=3,fill){ctx.beginPath();coords(ctx);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=width;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke()}}
+function ellipse(x,y,rx,ry,fill,stroke,width=2){path(c=>c.ellipse(x,y,rx,ry,0,0,Math.PI*2),stroke,width,fill)}
+function geometry(v){let m=Object.fromEntries(A2F.NAMES.map((n,i)=>[n,clamp(v[i])]));return {m,rightX:390-55*(m.right_mouth_x-.5),leftX:610+55*(m.left_mouth_x-.5),rightY:458-85*(m.right_mouth_y-.5),leftY:458-85*(m.left_mouth_y-.5),jaw:m.jaw_y}}
+function rig(v,ghost=false){const {m,rightX:rx,leftX:lx,rightY:ry,leftY:ly,jaw}=geometry(v);let stroke=ghost?'#90a8ad':'#315665';ctx.save();ctx.globalAlpha=ghost?.36:1;if(ghost)ctx.setLineDash([5,7]);
+for(const [side,x] of [['right',395],['left',605]]){let outer=side==='right'?x-68:x+68,inner=side==='right'?x+65:x-65;let oy=285-74*(m[side+'_outer_brow_y']-.5),iy=285-74*(m[side+'_inner_brow_y']-.5);path(c=>{c.moveTo(outer,oy);c.quadraticCurveTo(x,(oy+iy)/2-13,inner,iy)},stroke,ghost?2:10);
+let up=18+38*(m[side+'_upper_lid_y']-.5),low=14-32*(m[side+'_lower_lid_y']-.5);up=Math.max(1,up);low=Math.max(1,low);path(c=>{c.moveTo(x-60,345);c.quadraticCurveTo(x,345-up*2,x+60,345);c.quadraticCurveTo(x,345+low*2,x-60,345);c.closePath()},stroke,ghost?2:3,ghost?null:'#f2f9f7');
+if(!ghost){ctx.save();ctx.beginPath();ctx.moveTo(x-60,345);ctx.quadraticCurveTo(x,345-up*2,x+60,345);ctx.quadraticCurveTo(x,345+low*2,x-60,345);ctx.clip();ellipse(x,345,19,21,'#467687');ellipse(x,345,9,11,'#152e39');ellipse(x-5,339,4,4,'#f5ffff');ctx.restore()}}
+let centerY=461,open=3+90*jaw;path(c=>{c.moveTo(rx,ry);c.bezierCurveTo(rx+50,centerY-9,lx-50,centerY-9,lx,ly);c.bezierCurveTo(lx-45,centerY+open,rx+45,centerY+open,rx,ry);c.closePath()},ghost?'#769895':'#916b69',ghost?2:4,ghost?null:'#49363b');
+if(!ghost&&jaw>.10){ctx.save();ctx.beginPath();ctx.moveTo(rx,ry);ctx.bezierCurveTo(rx+50,centerY-9,lx-50,centerY-9,lx,ly);ctx.bezierCurveTo(lx-45,centerY+open,rx+45,centerY+open,rx,ry);ctx.clip();path(c=>{c.moveTo(rx+16,457);c.quadraticCurveTo(500,479,lx-16,457);c.lineTo(lx-22,477);c.quadraticCurveTo(500,489,rx+22,477);c.closePath()},null,0,'#e7e5dc');ctx.restore()}
+if(ghost){path(c=>{c.moveTo(430,535+35*jaw);c.quadraticCurveTo(500,565+35*jaw,570,535+35*jaw)},stroke,2)}else{ellipse(rx,ry,4,4,'#91e8c8');ellipse(lx,ly,4,4,'#91e8c8')}
+ctx.restore()}
+function drawFace(v){ctx.clearRect(0,0,1000,660);let bg=ctx.createRadialGradient(500,310,20,500,310,560);bg.addColorStop(0,'#263d48');bg.addColorStop(1,'#101b22');ctx.fillStyle=bg;ctx.fillRect(0,0,1000,660);ctx.strokeStyle='#ffffff07';ctx.lineWidth=1;for(let x=20;x<1000;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,660);ctx.stroke()}for(let y=20;y<660;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(1000,y);ctx.stroke()}
+ellipse(500,615,200,16,'#08131960');path(c=>{c.moveTo(422,534);c.lineTo(412,595);c.quadraticCurveTo(500,634,588,595);c.lineTo(578,534)},null,0,'#819fa6');
+let jaw=clamp(v[12]),skin=ctx.createLinearGradient(300,200,680,590);skin.addColorStop(0,'#dbe9e8');skin.addColorStop(.48,'#b9d0d1');skin.addColorStop(1,'#7e9da7');ellipse(296,365,24,50,'#8eafb7');ellipse(704,365,24,50,'#8eafb7');path(c=>{c.moveTo(500,108);c.bezierCurveTo(350,108,292,202,300,355);c.bezierCurveTo(301,471,364,568+24*jaw,500,588+24*jaw);c.bezierCurveTo(636,568+24*jaw,699,471,700,355);c.bezierCurveTo(708,202,650,108,500,108);c.closePath()},'#d1e8e580',2,skin);
+path(c=>{c.moveTo(494,337);c.quadraticCurveTo(477,389,482,409);c.quadraticCurveTo(500,420,518,409)},'#75959e',3);path(c=>{c.moveTo(475,423);c.quadraticCurveTo(500,432,525,423)},'#72929b',2);
+rig(v);if($('neutral').checked)rig(neutral,true);ctx.fillStyle='#9ab1bb';ctx.font='16px system-ui';ctx.fillText('R',248,330);ctx.fillText('L',742,330);ctx.font='13px system-ui';ctx.fillStyle='#a9c5c4';ctx.fillText('MOTOR-DRIVEN / 13 CHANNELS',30,35);if(!data){ctx.fillStyle='#c6dfdc';ctx.font='16px system-ui';ctx.fillText('导入 NPY 后，这个头部将跟随动作数据播放',310,77)}}
+function drawWave(){wc.clearRect(0,0,1000,62);wc.fillStyle='#91e8c866';for(let x=0;x<peaks.length;x++){let h=Math.max(1,peaks[x]*52);wc.fillRect(x,31-h/2,1,h)}if(!peaks.length){wc.fillStyle='#6f828c';wc.font='14px system-ui';wc.fillText(data?'文件没有音频 · 仍可播放动作':'音频波形',10,35)}if(data){wc.fillStyle='#96e8c8';wc.fillRect(Math.min(999,time/data.duration*1000),0,2,62)}}
+function render(){let s=data?A2F.sample(data,time):{index:0,values:neutral};drawFace(s.values);drawWave();for(let i=0;i<13;i++){bars[i].fill.style.width=clamp(s.values[i])*100+'%';bars[i].output.textContent=s.values[i].toFixed(3)}$('clock').textContent=clock(time)+' / '+clock(data?.duration||0);$('seek').value=time;$('frame').textContent=data?'帧 '+(s.index+1)+' / '+data.n:'帧 —'}
+function stopAudio(){audioEpoch++;if(source){try{source.stop()}catch{}source.disconnect();source=null}}
+async function startAudio(){stopAudio();const epoch=audioEpoch;if(!data?.audio||!$('sound').checked||!playing)return;try{context=context||new(window.AudioContext||window.webkitAudioContext)();await context.resume();if(epoch!==audioEpoch||!playing||!data?.audio||!$('sound').checked)return;if(!audioBuffer){audioBuffer=context.createBuffer(1,data.audio.length,data.rate);audioBuffer.copyToChannel(Float32Array.from(data.audio),0)}let offset=time;if(offset>=audioBuffer.duration)return;source=context.createBufferSource();source.buffer=audioBuffer;source.playbackRate.value=rate;source.connect(context.destination);source.start(0,offset)}catch(e){message('动作可正常播放；音频播放失败：'+e.message,true)}}
+function pause(){playing=false;stopAudio();$('play').textContent='播放'}
+function play(){if(!data)return;if(time>=data.duration-.001)time=0;playing=true;last=performance.now();$('play').textContent='暂停';startAudio()}
+function seek(t){time=Math.max(0,Math.min(data?.duration||0,t));last=performance.now();if(playing)startAudio();render()}
+function step(delta){if(!data)return;pause();let i=A2F.sample(data,time).index;i=Math.max(0,Math.min(data.n-1,i+delta));seek(data.times[i])}
+function animate(now){if(playing&&data){time+=(now-last)/1000*rate;last=now;if(time>=data.duration){if($('loop').checked){time=0;startAudio()}else{time=data.duration;pause()}}render()}requestAnimationFrame(animate)}
+async function load(file){const token=++loadToken;pause();$('play').disabled=true;message('正在读取 '+file.name+' …');try{if(file.size>200*1024*1024)throw Error('文件超过200 MiB上限');let parsed=A2F.parse(await file.arrayBuffer());if(token!==loadToken)return;let next=A2F.prepare(parsed,Number($('fpsInput').value));data=next;currentFile=file;audioBuffer=null;time=0;peaks=[];if(data.audio)for(let x=0;x<1000;x++){let a=Math.floor(x*data.audio.length/1000),b=Math.floor((x+1)*data.audio.length/1000),p=0;for(let i=a;i<b;i++)p=Math.max(p,Math.abs(data.audio[i]));peaks.push(Math.min(1,p))}
+for(const id of ['play','prev','next','seek'])$(id).disabled=false;$('seek').max=data.duration;$('rawRate').hidden=!data.pure;$('title').textContent=file.name;$('title').style.overflowWrap='anywhere';$('badge').textContent=data.fps.toFixed(2)+' Hz';$('fps').textContent=data.fps.toFixed(3)+' Hz';$('shape').textContent=data.n.toLocaleString()+' × 13';$('emotion').textContent=(data.meta.emotion||'未记录')+' / '+(data.meta.intensity??'—');$('audioInfo').textContent=data.audio?(data.audio.length/data.rate).toFixed(2)+' 秒 · '+data.rate+' Hz':'无音频';$('field').textContent=data.key;for(const b of $('list').children)b.classList.toggle('active',files[Number(b.dataset.index)]===file);message(data.outOfRange?'文件已加载；'+data.outOfRange+' 个数值超出0～1，头部显示已限幅，数值面板保留原值。':`已加载 ${file.name}。按播放开始；动作与音频按同一时间轴播放。`,!!data.outOfRange);render()
+}catch(e){if(token!==loadToken)return;$('play').disabled=!data;message('无法读取：'+e.message,true)}}
+function addFiles(selected){let candidates=Array.from(selected).filter(f=>/\.npy$/i.test(f.name));if(!candidates.length){message('请选择 .npy 文件。',true);return}for(const f of candidates){if(!files.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))files.push(f)}$('list').replaceChildren();files.forEach((f,i)=>{let b=document.createElement('button');b.className='filebtn';b.dataset.index=i;b.textContent=f.name;b.onclick=()=>load(f);$('list').append(b)});const first=candidates[0];load(files.find(x=>x.name===first.name&&x.size===first.size&&x.lastModified===first.lastModified))}
+$('files').onchange=e=>{addFiles(e.target.files);e.target.value=''};for(const event of ['dragover','drop'])document.addEventListener(event,e=>e.preventDefault());$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};$('drop').ondragleave=()=> $('drop').classList.remove('drag');$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('drag');addFiles(e.dataTransfer.files)};
+$('play').onclick=()=>playing?pause():play();$('prev').onclick=()=>step(-1);$('next').onclick=()=>step(1);$('seek').oninput=e=>seek(Number(e.target.value));$('speed').onchange=e=>{rate=Number(e.target.value);last=performance.now();if(playing)startAudio()};$('sound').onchange=()=>{if(playing)startAudio()};$('neutral').onchange=render;$('fpsInput').onchange=()=>{let fps=Number($('fpsInput').value);if(!(fps>=1&&fps<=1000)){message('采样率需在1～1000 Hz之间。',true);return}if(data?.pure&&currentFile)load(currentFile)};
+document.addEventListener('keydown',e=>{if(['INPUT','SELECT','BUTTON'].includes(e.target.tagName)||!data)return;if(e.code==='Space'){e.preventDefault();playing?pause():play()}else if(e.code==='ArrowLeft'){e.preventDefault();step(-1)}else if(e.code==='ArrowRight'){e.preventDefault();step(1)}});
+render();requestAnimationFrame(animate);
+})();
+</script></body></html>

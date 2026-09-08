@@ -1,0 +1,19 @@
+# 超过 GitHub 100MB 单文件限制的大文件，需从 NVIDIA NGC 或内网另行分发
+audio2face-3d-model/network.onnx
+audio2face-3d-model/model_data.npz
+
+# Python 产物
+__pycache__/
+*.pyc
+.venv/
+
+# 历史备份目录
+a2f_tts_motion_bridge.backup.*/
+a2f_tts_motion_bridge.bak.*/
+a2f_tts_motion_bridge/motion_core/backup_*/
+
+# 日志
+logs/
+
+# 模型缓存
+.cache/
