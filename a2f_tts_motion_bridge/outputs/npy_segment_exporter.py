@@ -209,6 +209,13 @@ def build_payload_from_recorder(
         "intensity": float(intensity),
     }
     meta.update(recorder.meta_extra)
+    if recorder.behavior_layer is not None:
+        base_all = _recorder_array(recorder.base_motor_values, native_count, width=motor_width)
+        base_dense = resample_to_times(frame_times_all, base_all, frame_times_30, empty_value=motor_neutral)
+        behavior_speech = np.maximum(speech_gate_30, np.clip(audio_rms_30/.035,0,1))
+        motor_values_30 = recorder.behavior_layer.apply_array(frame_times_30, base_dense, behavior_speech, recorder.motor_names)
+        if len(features_30): features_30[:,0] = motor_values_30[:,-1]
+        meta.update(recorder.behavior_layer.metadata())
 
     payload = {
         "meta": meta,
@@ -218,6 +225,7 @@ def build_payload_from_recorder(
         "features_native": features,
         "arkit52_native": arkit52,
         "motor_values_native": motor_values,
+        "motor_base_values_native": np.asarray(recorder.base_motor_values, dtype=np.float32).reshape(-1,motor_width)[mask],
         "audio_rms_native": audio_rms,
         "speech_gate_native": speech_gate,
         "emotion_vectors_native": np.asarray(recorder.emotion_vectors, dtype=np.float32).reshape(-1, 26)[mask],

@@ -15,6 +15,8 @@ class SessionRecorder:
         self.arkit52_names = []
         self.motor_names = list(MOTOR_CFG.keys())
         self.motor_values = []
+        self.base_motor_values = []
+        self.behavior_layer = None
         self.audio_16k_all = []
         self.audio_rms = []
         self.speech_gate = []
@@ -40,6 +42,7 @@ class SessionRecorder:
         arkit52: Optional[Dict[str, float]] = None,
         audio_rms: Optional[float] = None,
         debug_extra: Optional[Dict[str, float]] = None,
+        base_motors: Optional[Dict[str, float]] = None,
     ):
         self.frame_times.append(float(time_code_s))
         self.weights.append(np.asarray(weights169, dtype=np.float32))
@@ -53,8 +56,13 @@ class SessionRecorder:
             float(feats["blink_like"]),
         ])
         self.motor_values.append([float(motors[k]) for k in self.motor_names])
+        base_motors = base_motors if isinstance(base_motors, dict) else motors
+        self.base_motor_values.append([float(base_motors[k]) for k in self.motor_names])
         self.audio_rms.append(float(audio_rms) if audio_rms is not None else 0.0)
         debug_extra = debug_extra or {}
+        for key in ('calibration_sha256', 'robot_id'):
+            if isinstance(debug_extra.get(key), str) and debug_extra[key]:
+                self.meta_extra[key] = debug_extra[key]
         self.emotion_vectors.append(debug_extra.get('emotion_vector', [0.0] * 26))
         self.emotion_bias_scales.append(float(debug_extra.get('emotion_bias_scale', 0.0)))
         self.speech_gate.append(float(debug_extra.get("speech_gate", 0.0)))
@@ -90,6 +98,7 @@ class SessionRecorder:
         weights = np.asarray(self.weights, dtype=np.float32)
         features = np.asarray(self.features, dtype=np.float32)
         motor_values = np.asarray(self.motor_values, dtype=np.float32)
+        base_motor_values = np.asarray(self.base_motor_values, dtype=np.float32)
         if self.arkit52_names and self.arkit52:
             arkit52 = np.asarray(self.arkit52, dtype=np.float32)
         else:
@@ -118,6 +127,7 @@ class SessionRecorder:
             arkit52_30 = arkit52.copy()
 
         meta = {
+            **(self.behavior_layer.metadata() if self.behavior_layer is not None else {}),
             "target_sr": TARGET_SR,
             "window": WINDOW,
             "hop": HOP,
@@ -132,6 +142,11 @@ class SessionRecorder:
             "arkit52_names": self.arkit52_names,
         }
         meta.update(self.meta_extra)
+        if self.behavior_layer is not None:
+            _, base_30 = self._interp_to_fps(frame_times, base_motor_values, EXPORT_FPS)
+            behavior_speech = np.maximum(speech_gate_30, np.clip(audio_rms_30/.035,0,1))
+            motor_values_30 = self.behavior_layer.apply_array(frame_times_30, base_30, behavior_speech, self.motor_names)
+            if len(features_30): features_30[:,0] = motor_values_30[:,-1]
 
         payload = {
             "meta": meta,
@@ -141,6 +156,7 @@ class SessionRecorder:
             "features_native": features,
             "arkit52_native": arkit52,
             "motor_values_native": motor_values,
+            "motor_base_values_native": base_motor_values,
             "audio_rms_native": audio_rms,
             "speech_gate_native": speech_gate,
             "emotion_vectors_native": np.asarray(self.emotion_vectors, dtype=np.float32).reshape(-1, 26),

@@ -135,7 +135,15 @@ def dof_row_to_dict(names, row):
     return d
 
 
+def front_view_dofs(d):
+    """Screen-left is robot-right. Only transform drawing, never motor data."""
+    return {key: d[('right_'+key[5:] if key.startswith('left_') else
+                   'left_'+key[6:] if key.startswith('right_') else key)]
+            for key in d}
+
+
 def draw_face(img, d):
+    d = front_view_dofs(d)
     cx, cy = W // 2 - 130, 450
     cv2.ellipse(img, (cx, cy), (225, 305), 0, 0, 360, GRID, 2, cv2.LINE_AA)
 
@@ -158,8 +166,8 @@ def draw_face(img, d):
         # side=-1 left, side=+1 right. outer is farther from center.
         x_outer = x_center - 65 if side < 0 else x_center + 65
         x_inner = x_center + 65 if side < 0 else x_center - 65
-        y_outer = int(brow_base_y - (outer_y - 0.5) * 90)
-        y_inner = int(brow_base_y - (inner_y - 0.5) * 90)
+        y_outer = int(brow_base_y - (outer_y - 0.5) * 180)
+        y_inner = int(brow_base_y - (inner_y - 0.5) * 180)
         cv2.line(img, (x_outer, y_outer), (x_inner, y_inner), FG, 5, cv2.LINE_AA)
 
     draw_brow_segment(lx, lb_o, lb_i, side=-1)

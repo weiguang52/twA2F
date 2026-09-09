@@ -478,9 +478,10 @@ class A2F169ToARKit52:
         eye_squint = np.clip(0.58 * blink + 0.22 * eye_act, 0.0, 1.0)
         eye_wide = np.clip(0.22 * (1.0 - blink) * eye_act, 0.0, 1.0)
 
-        brow_inner = np.clip(0.74 * upper, 0.0, 1.0)
-        brow_outer = np.clip(0.56 * upper, 0.0, 1.0)
-        brow_down = np.clip(0.18 * blink + 0.12 * eye_act, 0.0, 1.0)
+        # Unsigned activity cannot identify brow direction. Preserve the
+        # geometry-derived brow channels instead of inventing bilateral lifts
+        # (or treating every blink as a frown).
+        brow_inner = brow_outer = brow_down = 0.0
         cheek_sq = np.clip(0.12 * smile + 0.16 * eye_squint, 0.0, 1.0)
         nose_sneer = np.clip(0.10 * smile + 0.06 * upper, 0.0, 1.0)
         cheek_puff = np.clip(0.18 * pucker, 0.0, 1.0)

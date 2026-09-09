@@ -189,8 +189,8 @@ class VoiceAgentCompat(vapb2_grpc.VoiceAgentServicer):
         state: Dict[str, object],
     ) -> None:
         meta = dict(req.meta)
-        # Validates P06 vectors plus P16 JSON mixtures/VA, latent and timing options
-        # atomically, scheduled at the next chunk's sample-clock boundary.
+        # Validate P06/P16 controls and P26 style/idle/event metadata atomically.
+        # Event offsets start at this chunk's sample-clock boundary, not arrival.
         session.update_emotion_meta(meta)
         exporter.update_emotion(session.config.emotion, session.config.intensity)
         state['emotion'] = session.config.emotion

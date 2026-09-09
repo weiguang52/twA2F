@@ -36,6 +36,7 @@ class MotorFrame:
     time_code_ms: int
     motor_values: List[float]
     debug_features: List[float]
+    speech_gate: float = 0.
 
 
 @dataclass

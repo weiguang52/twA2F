@@ -23,6 +23,10 @@ from __future__ import annotations
 from typing import Dict, Optional
 
 import numpy as np
+import os
+from pathlib import Path
+from .behavior_layer import BehaviorLayer
+from .retarget_calibration import RetargetCalibration, robot_name
 from .emotion_control import EmotionControl, canonical_emotion
 from .settings import EXPLICIT_EMOTION_LABELS, EMOTION_BIAS_SCALE
 
@@ -32,7 +36,7 @@ except ImportError:  # pragma: no cover
     from data.a2f.a2f_tts_motion_bridge.motion_core.a2f169_to_arkit52 import A2F169ToARKit52
 
 
-RETARGET_VERSION = "current_head_arkit52_to_norm_dof_v3_p06_10emotion"
+RETARGET_VERSION = "current_head_arkit52_to_norm_dof_v4_p26_behavior_calibration"
 
 # Current logical DOFs for the new head mechanism.
 # 8 four-bar vertical modules + 2D right mouth corner + 2D left mouth corner + direct jaw = 13.
@@ -150,7 +154,7 @@ def _get(bs: Dict[str, float], key: str) -> float:
     return float(bs.get(key, 0.0))
 
 
-def _emotion_bias(emotion: str, intensity: float) -> Dict[str, float]:
+def _emotion_bias(emotion: str, intensity: float, left_scale=1., right_scale=1.) -> Dict[str, float]:
     """Small retarget-space bias so preview emotions are visibly different.
 
     These biases are intentionally conservative. They change only logical targets,
@@ -176,16 +180,18 @@ def _emotion_bias(emotion: str, intensity: float) -> Dict[str, float]:
         z["right_mouth_x"] -= 0.06 * s
         z["left_mouth_y"] -= 0.20 * s
         z["right_mouth_y"] -= 0.20 * s
-        z["left_inner_brow_y"] += 0.14 * s
-        z["right_inner_brow_y"] += 0.14 * s
-        z["left_outer_brow_y"] -= 0.08 * s
-        z["right_outer_brow_y"] -= 0.08 * s
+        # Increase differential tilt while preserving the mean brow offset.
+        z["left_inner_brow_y"] += 0.22 * s
+        z["right_inner_brow_y"] += 0.22 * s
+        z["left_outer_brow_y"] -= 0.16 * s
+        z["right_outer_brow_y"] -= 0.16 * s
     elif e in {"angry", "anger"}:
         # Brows down/in, tighter lower lids, smaller mouth. Four-bar y uses vertical only.
-        z["left_inner_brow_y"] -= 0.18 * s
-        z["right_inner_brow_y"] -= 0.18 * s
-        z["left_outer_brow_y"] -= 0.10 * s
-        z["right_outer_brow_y"] -= 0.10 * s
+        # Redistribute the same mean depression into the inner brow.
+        z["left_inner_brow_y"] -= 0.28 * s
+        z["right_inner_brow_y"] -= 0.28 * s
+        z["left_outer_brow_y"] += 0.0 * s
+        z["right_outer_brow_y"] += 0.0 * s
         z["left_lower_lid_y"] += 0.10 * s
         z["right_lower_lid_y"] += 0.10 * s
         z["left_upper_lid_y"] -= 0.06 * s
@@ -247,6 +253,12 @@ def _emotion_bias(emotion: str, intensity: float) -> Dict[str, float]:
             z[f'{side}_upper_lid_y'] = -0.06 * s
             z[f'{side}_inner_brow_y'] = 0.06 * s
             z[f'{side}_mouth_x'] = -0.08 * s
+    for side, scale in (('left', left_scale), ('right', right_scale)):
+        if not np.isfinite(scale) or not 0 <= scale <= 2:
+            raise ValueError('Emotion side scales must be finite in [0,2]')
+        for key in z:
+            if key.startswith(side+'_'):
+                z[key] *= scale
     return z
 
 
@@ -257,6 +269,9 @@ def arkit52_to_current_head_dofs(
     intensity: float = 1.0,
     control: Optional[EmotionControl] = None,
     bias_scale: float = EMOTION_BIAS_SCALE,
+    calibration: Optional[RetargetCalibration] = None,
+    left_scale: float = 1.,
+    right_scale: float = 1.,
 ) -> Dict[str, float]:
     """Stateless ARKit52 -> current normalized mechanism DOFs.
 
@@ -342,17 +357,39 @@ def arkit52_to_current_head_dofs(
         "jaw_y": jaw_y,
     }
 
+    if calibration is not None:
+        dofs = calibration.predict(bs)
+    else:
+        # Conservative proxies for mechanisms absent from this 13-DOF head.
+        # A real calibrated matrix uses all 52 channels instead of these guesses.
+        for side in ('left','right'):
+            suffix = side.title()
+            sneer = clip(_get(bs,'noseSneer'+suffix))
+            puff = clip(_get(bs,'cheekPuff'))
+            shrug = clip(_get(bs,'mouthShrugUpper')) - clip(_get(bs,'mouthShrugLower'))
+            dofs[side+'_mouth_y'] = clip(dofs[side+'_mouth_y'] - .04*sneer + .025*shrug)
+            dofs[side+'_lower_lid_y'] = clip(dofs[side+'_lower_lid_y'] + .04*sneer + .02*puff)
+            dofs[side+'_upper_lid_y'] = clip(dofs[side+'_upper_lid_y'] - .02*sneer)
+            dofs[side+'_mouth_x'] = clip(dofs[side+'_mouth_x'] + .035*puff)
+
     # Add conservative emotion-space offsets after ARKit mapping.
     control = control or EmotionControl(emotion, intensity, bias_scale=bias_scale)
     bias = {k: 0.0 for k in CURRENT_HEAD_DOF_NAMES}
     for label, weight in zip(EXPLICIT_EMOTION_LABELS, control.explicit()):
         if weight:
-            offsets = _emotion_bias(label, float(weight))
+            offsets = _emotion_bias(label, float(weight), left_scale, right_scale)
             for k in bias:
                 bias[k] += offsets[k]
     for k in CURRENT_HEAD_DOF_NAMES:
         base, offset = dofs[k], bias[k] * control.bias_scale
         neutral = MOTOR_CFG[k]['neutral']
+        if 'brow' in k:
+            # Bounded, signed expression residual: a weak opposing projection
+            # must not veto anger's downward / sadness's tilted brow request.
+            # Preserve geometry dynamics and the bias_scale=0 model-only path.
+            # Unlike unipolar mouth/lid channels, brows are centered at 0.5.
+            dofs[k] = clip(base + float(np.clip(offset, -0.15, 0.15)))
+            continue
         # Never reverse a model-driven displacement with a hand-authored offset.
         if (base - neutral) * offset < 0:
             offset = 0.0
@@ -398,7 +435,22 @@ class OnlineRetargeter:
     def preload_model_bundle(model_dir: Optional[str] = None) -> bool:
         return A2F169ToARKit52.preload_bundle(model_dir=model_dir)
 
-    def __init__(self, model_dir: Optional[str] = None, calib_frames: int = 20, **_ignored):
+    def __init__(self, model_dir: Optional[str] = None, calib_frames: int = 20,
+                 behaviors=None, calibration_path=None, robot_id=None, **_ignored):
+        self.behaviors = behaviors if behaviors is not None else BehaviorLayer()
+        self.calibration = None
+        if robot_id:
+            robot_name(robot_id)
+            directory = os.environ.get('A2F_CALIBRATION_DIR')
+            if not directory:
+                raise ValueError('Set operator-controlled A2F_CALIBRATION_DIR for robot_id')
+            trusted_root = Path(directory).resolve()
+            calibration_path = (trusted_root / ('calib_'+robot_id+'.json')).resolve()
+            if calibration_path.parent != trusted_root:
+                raise ValueError('Calibration path escapes trusted directory')
+        if calibration_path:
+            self.calibration = RetargetCalibration(calibration_path, robot_id)
+        self.last_base_dofs = {k:v['neutral'] for k,v in MOTOR_CFG.items()}
         self.mapper = A2F169ToARKit52(model_dir=model_dir, calib_frames=calib_frames)
         self.speech_gate = SpeechGate()
         self.ema = AsymmetricEMA()
@@ -432,9 +484,10 @@ class OnlineRetargeter:
         return bs
 
     def update(self, w169, emotion: str = "neutral", intensity: float = 1.0,
-               audio_rms: Optional[float] = None, control: Optional[EmotionControl] = None):
+               audio_rms: Optional[float] = None, control: Optional[EmotionControl] = None, time_code_s=None):
         control = control or EmotionControl(emotion, intensity)
         bs = self.project_blendshapes(w169, audio_rms=audio_rms)
+        behavior_config = self.behaviors.config_at(float(time_code_s or 0.))
         speech_gate = self.speech_gate.update(
             audio_rms,
             fallback=max(_get(bs, "jawOpen"), _get(bs, "mouthFunnel"), _get(bs, "mouthPucker")),
@@ -445,14 +498,24 @@ class OnlineRetargeter:
             emotion=emotion,
             intensity=intensity,
             control=control,
+            calibration=self.calibration,
+            left_scale=behavior_config.bias_left_scale,
+            right_scale=behavior_config.bias_right_scale,
         )
         dofs = self._smooth_dofs(raw_dofs)
+        self.last_base_dofs = dict(dofs)
+        if time_code_s is not None:
+            self.behaviors.observe_audio(float(time_code_s), audio_rms)
+            behavior_speech = max(speech_gate, clip(float(audio_rms or 0.)/.035))
+            dofs = self.behaviors.apply(dofs, float(time_code_s), behavior_speech)
         feats = debug_features_from_arkit52(bs, dofs, speech_gate)
         self.last_debug = {
             "speech_gate": feats["speech_gate"],
             "arkit_jawOpen": _get(bs, "jawOpen"),
             "arkit_mouthClose": _get(bs, "mouthClose"),
             "retarget_version": RETARGET_VERSION,
+            "calibration_sha256": self.calibration.sha256 if self.calibration else '',
+            "robot_id": self.calibration.robot_id if self.calibration else '',
             **control.metadata(),
         }
         feats_out = {

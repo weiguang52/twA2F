@@ -10,6 +10,7 @@ from .motion_recorder import SessionRecorder
 from .arkit52_to_motor import OnlineRetargeter
 from .emotion_control import EmotionControl, canonical_emotion
 from .emotion_track import EmotionTrack
+from .behavior_layer import BehaviorLayer
 
 
 def now_ms() -> int:
@@ -42,9 +43,13 @@ class MotorStreamSession:
         self.engine.emotion_provider = self.emotion_track.sample
         model_dir = model_path if os.path.isdir(model_path) else os.path.dirname(model_path)
         retarget_started = time.perf_counter()
-        self.retargeter = OnlineRetargeter(model_dir=model_dir, calib_frames=20)
+        self.behavior_layer = BehaviorLayer()
+        self.behavior_layer.schedule(config.extra, 0.)
+        self.retargeter = OnlineRetargeter(model_dir=model_dir, calib_frames=20,
+            behaviors=self.behavior_layer, robot_id=config.extra.get('robot_id'))
         self.retarget_init_ms = (time.perf_counter() - retarget_started) * 1000.0
         self.recorder = SessionRecorder()
+        self.recorder.behavior_layer = self.behavior_layer
         self.recorder.set_meta_extra(
             retarget_version=getattr(self.retargeter, "retarget_version", "unknown"),
             arkit_mapper="raw169_to_arkit52_hybrid",
@@ -67,10 +72,16 @@ class MotorStreamSession:
                                       intensity=self.config.intensity if intensity is None else intensity))
 
     def update_emotion_meta(self, meta):
+        if 'robot_id' in meta and meta['robot_id'] != self.config.extra.get('robot_id'):
+            raise ValueError('robot_id cannot change inside a session')
+        prepared = (self.behavior_layer.prepare(meta, int(self.engine.total_received)/float(TARGET_SR))
+                    if hasattr(self, 'behavior_layer') else None)
         updated = self.emotion_control.patch(meta)
         if hasattr(self, 'emotion_track'):
             self.emotion_track.schedule(updated, meta, int(self.engine.total_received) / float(TARGET_SR))
         # Both protocol and track validation finish before mutating session state.
+        if prepared is not None:
+            self.behavior_layer.commit(prepared)
         self.emotion_control = updated
         self.config.emotion = updated.emotion
         self.config.intensity = updated.intensity
@@ -90,8 +101,10 @@ class MotorStreamSession:
                 raise ValueError('Specify AudioChunk.emotion_mix or meta emotion_mix, not both')
             meta['emotion_mix'] = chunk.emotion_mix
         control = self.emotion_control.patch(changes).patch(meta)
+        prepared = self.behavior_layer.prepare(meta, int(self.engine.total_received)/float(TARGET_SR))
         self.emotion_track.schedule(control, meta, int(self.engine.total_received) / float(TARGET_SR))
         # Validate before adding any audio; a rejected update leaves no partial data.
+        self.behavior_layer.commit(prepared)
         self.emotion_control = control
         self.config.emotion, self.config.intensity = control.emotion, control.intensity
         self.recorder.set_meta_extra(**control.metadata())
@@ -126,6 +139,7 @@ class MotorStreamSession:
                 intensity=item_intensity,
                 audio_rms=item.get("audio_rms"),
                 control=item.get("emotion_control"),
+                time_code_s=item['time_code_s'],
             )
             t3 = time.perf_counter()
             self.retarget_ms_total += (t3 - t2) * 1000.0
@@ -139,11 +153,13 @@ class MotorStreamSession:
                 arkit52=getattr(self.retargeter, "last_blendshapes", None),
                 audio_rms=item.get("audio_rms"),
                 debug_extra=getattr(self.retargeter, "last_debug", None),
+                base_motors=getattr(self.retargeter, 'last_base_dofs', None),
             )
             frame = MotorFrame(
                 frame_id=self.frame_id,
                 time_code_ms=int(round(item["time_code_s"] * 1000.0)),
-                motor_values=[motors[name] for name in self.motor_names],
+                motor_values=list(self.recorder.base_motor_values[-1]),
+                speech_gate=max(self.recorder.speech_gate[-1], min(1.,self.recorder.audio_rms[-1]/.035)),
                 debug_features=[
                     feats["jaw_open"], feats["mouth_round"], feats["mouth_wide"],
                     feats["mouth_left_right"], feats["upper_face_activity"],
@@ -172,7 +188,9 @@ class MotorStreamSession:
                 target.append(MotorFrame(
                     frame_id=frame.frame_id * 10 + k,
                     time_code_ms=tc,
-                    motor_values=list(frame.motor_values),
+                    motor_values=list(self.behavior_layer.apply(
+                        dict(zip(self.motor_names, frame.motor_values)), tc/1000., frame.speech_gate).values()),
+                    speech_gate=frame.speech_gate,
                     debug_features=list(frame.debug_features),
                 ))
         return target
@@ -192,6 +210,7 @@ class MotorStreamSession:
                 intensity=item_intensity,
                 audio_rms=item.get("audio_rms"),
                 control=item.get("emotion_control"),
+                time_code_s=item['time_code_s'],
             )
             t3 = time.perf_counter()
             self.retarget_ms_total += (t3 - t2) * 1000.0
@@ -205,11 +224,13 @@ class MotorStreamSession:
                 arkit52=getattr(self.retargeter, "last_blendshapes", None),
                 audio_rms=item.get("audio_rms"),
                 debug_extra=getattr(self.retargeter, "last_debug", None),
+                base_motors=getattr(self.retargeter, 'last_base_dofs', None),
             )
             frame = MotorFrame(
                 frame_id=self.frame_id,
                 time_code_ms=int(round(item["time_code_s"] * 1000.0)),
-                motor_values=[motors[name] for name in self.motor_names],
+                motor_values=list(self.recorder.base_motor_values[-1]),
+                speech_gate=max(self.recorder.speech_gate[-1], min(1.,self.recorder.audio_rms[-1]/.035)),
                 debug_features=[
                     feats["jaw_open"], feats["mouth_round"], feats["mouth_wide"],
                     feats["mouth_left_right"], feats["upper_face_activity"],
@@ -221,6 +242,15 @@ class MotorStreamSession:
         return self._resample_frames_to_30hz(frames)
 
     def save_artifact(self) -> str:
+        return self._save_artifact()
+
+    def tick_idle(self, time_s: float) -> MotorFrame:
+        """Host-driven independent idle clock, no audio or ONNX call required."""
+        motors=self.behavior_layer.tick(time_s)
+        return MotorFrame(int(round(time_s*30)), int(round(time_s*1000)),
+                          [motors[k] for k in self.motor_names], [0.]*7)
+
+    def _save_artifact(self) -> str:
         if not self.config.save_npy:
             return ""
         out_dir = self.config.npy_save_dir or "."
