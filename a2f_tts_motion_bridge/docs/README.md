@@ -1,5 +1,7 @@
 # Retarget fix package
 
+Sustained brow rhythm configuration and limitations: [BROW_RHYTHM.md](BROW_RHYTHM.md).
+
 P26 style/idle/micro-events and candidate robot calibration: [BEHAVIOR_PROTOCOL_P26.md](BEHAVIOR_PROTOCOL_P26.md).
 
 P16 continuous emotion library, envelopes and per-chunk mixtures: [EMOTION_PROTOCOL_P16.md](EMOTION_PROTOCOL_P16.md).

@@ -9,6 +9,7 @@ from .emotion_control import finite_nonnegative
 from .idle_behaviors import IdleBehaviors
 from .style_overlay import STYLE_DURATIONS, style_offsets
 from .settings import MOTOR_CFG
+from .brow_rhythm import brow_rhythm_offsets
 
 
 def number(value,name,low=0.,high=1.):
@@ -28,6 +29,8 @@ class BehaviorConfig:
     idle_mode: str='off'
     auto_blink: bool=False
     auto_brow: bool=False
+    brow_rhythm: bool=True
+    brow_rhythm_gain: float=.35
     idle_gain: float=1.
     style_gain: float=1.
     behavior_speech_scale: float=.2
@@ -62,9 +65,9 @@ class BehaviorLayer:
             mode=meta['idle_mode']
             if mode not in ('off','idle','listening'):raise ValueError('idle_mode must be off/idle/listening')
             values.update(idle_mode=mode,auto_blink=mode!='off')
-        for key in ('auto_blink','auto_brow'):
+        for key in ('auto_blink','auto_brow','brow_rhythm'):
             if key in meta:values[key]=boolean(meta[key],key)
-        for key in ('idle_gain','style_gain','behavior_speech_scale','bias_left_scale','bias_right_scale'):
+        for key in ('idle_gain','style_gain','behavior_speech_scale','bias_left_scale','bias_right_scale','brow_rhythm_gain'):
             if key in meta:values[key]=number(meta[key],key,0,2 if key.startswith('bias_') else 1)
         config=replace(config,**values)
         actions=[];style=self.last_style;cancel=False
@@ -150,6 +153,9 @@ class BehaviorLayer:
             for k,v in d.items():delta[k]=delta.get(k,0.)+v
             for k,v in c.items():closure[k]=max(closure.get(k,0.),v)
         out=dict(base)
+        if config.brow_rhythm:
+            for key,value in brow_rhythm_offsets(base,time_s,self.seed,config.brow_rhythm_gain).items():
+                delta[key]=delta.get(key,0.)+value
         for name in MOTOR_CFG:
             amount=np.clip(delta.get(name,0.),-.3,.3)
             if 'mouth' in name or name=='jaw_y':amount*=mouth_scale
