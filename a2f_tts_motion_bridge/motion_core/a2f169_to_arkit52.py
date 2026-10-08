@@ -268,7 +268,11 @@ class A2F169ToARKit52:
                 bs_deltas_masked.append((pose - neutral).reshape(-1))
         bs_deltas_masked = np.stack(bs_deltas_masked, axis=1).astype(np.float32)
 
-        shapes_matrix_skin_masked = np.asarray(shapes_matrix_skin[:, mask, :], dtype=np.float32)
+        # Advanced indexing creates a strided layout. tensordot otherwise
+        # copies/reorders this large constant matrix for EVERY native frame.
+        # Normalize once in the shared model bundle; keep all solver math intact.
+        shapes_matrix_skin_masked = np.ascontiguousarray(
+            shapes_matrix_skin[:, mask, :], dtype=np.float32)
         lip_open_pose_delta_masked = np.asarray(lip_open_pose_delta[mask], dtype=np.float32).reshape(-1)
         eye_close_pose_delta_masked = np.asarray(eye_close_pose_delta[mask], dtype=np.float32).reshape(-1)
 
