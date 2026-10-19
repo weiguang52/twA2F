@@ -153,6 +153,10 @@ class BehaviorLayer:
             for k,v in d.items():delta[k]=delta.get(k,0.)+v
             for k,v in c.items():closure[k]=max(closure.get(k,0.),v)
         out=dict(base)
+        # Gate model jaw on actual sample time BEFORE intentional style/idle offsets.
+        # Applies identically to live frames and dense exports; no synthetic floor.
+        if getattr(self, 'jaw_audio_gate', None) is not None:
+            out['jaw_y'] *= self.jaw_audio_gate.sample(time_s)
         if config.brow_rhythm:
             for key,value in brow_rhythm_offsets(base,time_s,self.seed,config.brow_rhythm_gain).items():
                 delta[key]=delta.get(key,0.)+value

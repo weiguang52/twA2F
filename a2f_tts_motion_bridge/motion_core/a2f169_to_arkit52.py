@@ -346,6 +346,10 @@ class A2F169ToARKit52:
         self._calibrated = True
 
     def _jaw_open_scalar(self, jaw_vec: np.ndarray, speech_gate: float) -> float:
+        reference = getattr(self, 'jaw_reference', None)
+        if reference is not None:
+            from .jaw_reference import jaw_activity
+            return jaw_activity(jaw_vec, reference)
         if self.jaw_baseline is None:
             self.jaw_baseline = jaw_vec.astype(np.float32).copy()
 

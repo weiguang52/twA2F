@@ -187,8 +187,10 @@ class A2FModelRuntime:
         self.emotion_latent = EmotionLatentLibrary(latent_path) if os.path.isfile(latent_path) else None
         self.warmup_sec = 0.0
         self.warmup_run_sec: List[float] = []
-        if warmup > 0:
-            self._warmup(warmup)
+        # One silent-neutral pass is required even when performance warmup=0.
+        # Its reference is shared read-only; no user's first frame is a baseline.
+        self.jaw_reference = None
+        self._warmup(max(1, warmup))
 
     def _warmup(self, warmup: int) -> None:
         dummy = np.zeros((1, 1, WINDOW), dtype=np.float32)
@@ -199,7 +201,11 @@ class A2FModelRuntime:
                 for inp in self.inputs_meta
             }
             run_t0 = now()
-            _ = self.session.run(None, ort_inputs)
+            output = self.session.run(None, ort_inputs)
+            weights = _normalize_output_shape(_pick_output(output), 1)[0, 0]
+            self.jaw_reference = weights[150:165].copy()
+            if not np.isfinite(self.jaw_reference).all(): raise ValueError('Invalid silent model jaw reference')
+            self.jaw_reference.setflags(write=False)
             self.warmup_run_sec.append(now() - run_t0)
         self.warmup_sec = now() - t0
 

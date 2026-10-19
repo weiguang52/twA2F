@@ -50,6 +50,15 @@ class MotorStreamSession:
         self.retarget_init_ms = (time.perf_counter() - retarget_started) * 1000.0
         self.recorder = SessionRecorder()
         self.recorder.behavior_layer = self.behavior_layer
+        reference = getattr(self.engine.runtime, 'jaw_reference', None)
+        import numpy as np
+        if isinstance(reference, np.ndarray) and reference.shape == (15,):
+            from .jaw_reference import AudioJawGate
+            self.retargeter.mapper.jaw_reference = reference
+            self.behavior_layer.jaw_audio_gate = AudioJawGate(self.recorder.audio_16k_all)
+            self.recorder.set_meta_extra(jaw_mapping='silent_reference_distance_v1',
+                jaw_reference=reference.tolist(), jaw_audio_gate='centered_20ms_0.003_0.015',
+                jaw_activity_scale=1.5, jaw_activity_cap=0.85)
         self.recorder.set_meta_extra(
             retarget_version=getattr(self.retargeter, "retarget_version", "unknown"),
             arkit_mapper="raw169_to_arkit52_hybrid",
