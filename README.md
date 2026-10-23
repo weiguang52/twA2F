@@ -1,5 +1,13 @@
 # twA2F · Audio2Face → 机器人表情桥接服务
 
+## 2026-10-23：文本眉眼动作（KeyframeFace）
+
+新增可选离线编译器：官方 KeyframeFace LoRA + Qwen3-14B 量化基座，将提示词编译为
+ARKit 关键帧；会话通过 `text_face_clip` 播放，仅混合指定眉毛/眼睑区域。
+A2F 嘴部、下颌不变，眨眼保留最终优先级。默认不启用，不增加音频服务模型依赖。
+这是语义关键帧加时间插值，不是任意连续微表情的精确控制；复杂顺序需显式时间编排。
+安装、协议、限制与测试见 [文本眉眼接入说明](a2f_tts_motion_bridge/docs/text_face_keyframeface.md)。
+
 ## 2026-09-09：持续表情与可视化更新
 
 - P16 隐式情绪库、情绪包络和逐 chunk 混合已接入，见 [P16 协议](a2f_tts_motion_bridge/docs/EMOTION_PROTOCOL_P16.md)。

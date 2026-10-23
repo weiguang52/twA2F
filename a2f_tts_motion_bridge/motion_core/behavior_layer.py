@@ -10,6 +10,7 @@ from .idle_behaviors import IdleBehaviors
 from .style_overlay import STYLE_DURATIONS, style_offsets
 from .settings import MOTOR_CFG
 from .brow_rhythm import brow_rhythm_offsets
+from .text_face import TextFaceTrack
 
 
 def number(value,name,low=0.,high=1.):
@@ -41,6 +42,7 @@ class BehaviorConfig:
 class BehaviorLayer:
     def __init__(self,seed=0):
         self.seed=seed
+        self.text_face=TextFaceTrack()
         self.idle=IdleBehaviors(seed)
         self.configs=[(0.,BehaviorConfig())]
         self.events=[]
@@ -110,10 +112,12 @@ class BehaviorLayer:
             ids[ident]=signature
             parsed.append(dict(id=ident,type=kind,time=time_s+offset,created=time_s,duration=duration,weight=weight,side=side))
         if len(ids)>10000:raise ValueError('Session event budget exceeded (10000)')
-        return config,seed,parsed,ids,style,cancel,float(time_s)
+        text_face=self.text_face.prepare(meta,time_s)
+        return config,seed,parsed,ids,style,cancel,float(time_s),text_face
 
     def commit(self,prepared):
-        config,seed,events,ids,style,cancel,time_s=prepared
+        config,seed,events,ids,style,cancel,time_s,text_face=prepared
+        self.text_face.commit(text_face)
         if seed!=self.seed:self.seed=seed;self.idle=IdleBehaviors(seed)
         if config!=self.configs[-1][1]:self.configs.append((time_s,config))
         self.events.extend(events);self.events.sort(key=lambda e:e['time'])
@@ -164,6 +168,9 @@ class BehaviorLayer:
             amount=np.clip(delta.get(name,0.),-.3,.3)
             if 'mouth' in name or name=='jaw_y':amount*=mouth_scale
             out[name]=float(np.clip(out[name]+amount,0.,1.))
+        # Text owns only the requested upper-face region; blink closure wins last.
+        if self.text_face.entries:
+            out=self.text_face.apply(out,time_s)
         for side,value in closure.items():
             strength=float(np.clip(value,0,1))
             up,low=side+'_upper_lid_y',side+'_lower_lid_y'
@@ -185,7 +192,8 @@ class BehaviorLayer:
         return self.apply(base,time_s,0.)
 
     def metadata(self):
-        return dict(behavior_config=asdict(self.configs[-1][1]),behavior_seed=self.seed,
+        return dict(**self.text_face.metadata(),
+                    behavior_config=asdict(self.configs[-1][1]),behavior_seed=self.seed,
                     behavior_config_timeline=[dict(time=t,config=asdict(c)) for t,c in self.configs],
                     behavior_cancel_times=list(self.cancels),
                     behavior_events=list(self.events),behavior_version='p26_output_clock_v1',
