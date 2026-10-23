@@ -11,6 +11,7 @@ from .style_overlay import STYLE_DURATIONS, style_offsets
 from .settings import MOTOR_CFG
 from .brow_rhythm import brow_rhythm_offsets
 from .text_face import TextFaceTrack
+from .local_actions import LocalActionTrack
 
 
 def number(value,name,low=0.,high=1.):
@@ -43,6 +44,7 @@ class BehaviorLayer:
     def __init__(self,seed=0):
         self.seed=seed
         self.text_face=TextFaceTrack()
+        self.local_actions=LocalActionTrack()
         self.idle=IdleBehaviors(seed)
         self.configs=[(0.,BehaviorConfig())]
         self.events=[]
@@ -113,10 +115,12 @@ class BehaviorLayer:
             parsed.append(dict(id=ident,type=kind,time=time_s+offset,created=time_s,duration=duration,weight=weight,side=side))
         if len(ids)>10000:raise ValueError('Session event budget exceeded (10000)')
         text_face=self.text_face.prepare(meta,time_s)
-        return config,seed,parsed,ids,style,cancel,float(time_s),text_face
+        local_actions=self.local_actions.prepare(meta,time_s)
+        return config,seed,parsed,ids,style,cancel,float(time_s),text_face,local_actions
 
     def commit(self,prepared):
-        config,seed,events,ids,style,cancel,time_s,text_face=prepared
+        config,seed,events,ids,style,cancel,time_s,text_face,local_actions=prepared
+        self.local_actions.commit(local_actions)
         self.text_face.commit(text_face)
         if seed!=self.seed:self.seed=seed;self.idle=IdleBehaviors(seed)
         if config!=self.configs[-1][1]:self.configs.append((time_s,config))
@@ -171,6 +175,9 @@ class BehaviorLayer:
         # Text owns only the requested upper-face region; blink closure wins last.
         if self.text_face.entries:
             out=self.text_face.apply(out,time_s)
+        # Explicit local plans override only their channels; closure remains last.
+        if self.local_actions.actions:
+            out=self.local_actions.apply(out,time_s)
         for side,value in closure.items():
             strength=float(np.clip(value,0,1))
             up,low=side+'_upper_lid_y',side+'_lower_lid_y'
@@ -192,7 +199,7 @@ class BehaviorLayer:
         return self.apply(base,time_s,0.)
 
     def metadata(self):
-        return dict(**self.text_face.metadata(),
+        return dict(**self.text_face.metadata(),**self.local_actions.metadata(),
                     behavior_config=asdict(self.configs[-1][1]),behavior_seed=self.seed,
                     behavior_config_timeline=[dict(time=t,config=asdict(c)) for t,c in self.configs],
                     behavior_cancel_times=list(self.cancels),

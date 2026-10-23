@@ -1,5 +1,11 @@
 # twA2F · Audio2Face → 机器人表情桥接服务
 
+## 2026-10-23：结构化局部眉眼动作
+
+新增 `local_actions`：明确左右侧、强度、起势/保持/释放和定时顺序，覆盖目标通道但不改口型，眨眼最后处理。
+可选离线 Qwen3 将中文指令转为计划；执行轨迹为确定性程序，不冒充 KeyframeFace 模型输出。
+50 条固定指令的真实解析与执行验收分开记录，协议、优先级和复现方法见 [局部动作说明](a2f_tts_motion_bridge/docs/LOCAL_ACTIONS.md)。
+
 ## 2026-10-23：文本眉眼动作（KeyframeFace）
 
 新增可选离线编译器：官方 KeyframeFace LoRA + Qwen3-14B 量化基座，将提示词编译为
