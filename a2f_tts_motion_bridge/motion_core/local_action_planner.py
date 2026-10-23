@@ -67,7 +67,7 @@ class LocalActionPlanner:
 
     def parse(self,text):
         if not isinstance(text,str) or not text.strip() or len(text)>2000:raise ValueError('Instruction must be 1..2000 characters')
-        prompt=self.tokenizer.apply_chat_template([{'role':'system','content':SYSTEM},
+        prompt=self.tokenizer.apply_chat_template([{'role':'system','content':getattr(self,'system_prompt',SYSTEM)},
             {'role':'user','content':text}],tokenize=False,add_generation_prompt=True,enable_thinking=False)
         inputs=self.tokenizer(prompt,return_tensors='pt').to(self.model.device);start=time.monotonic()
         with self.torch.inference_mode():

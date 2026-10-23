@@ -1,3 +1,9 @@
+## 独立提示词表情路径
+
+新增独立 `prompt_face_server`：提示词或结构化计划 → 13 DOF，不依赖音频或 A2F 推理。
+沿用现有 gRPC ACTION/NPY 分段输出；支持微笑、皱眉、抬眉、眨眼及程度/有限情感修饰。
+启动、输入协议、边界与测试见 [独立提示词表情说明](a2f_tts_motion_bridge/docs/STANDALONE_PROMPT_FACE.md)。两个运动源需由调用方互斥选择。
+
 # twA2F · Audio2Face → 机器人表情桥接服务
 
 ## 2026-10-23：结构化局部眉眼动作
