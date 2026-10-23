@@ -1,5 +1,7 @@
 ## 独立提示词表情路径
 
+可选 `--fast-prompts`：明确中文单动作整句走严格语法快速路径，复杂描述回退 Qwen3；不配置模型时未匹配指令报错。不是新训练的表情模型。配置、支持范围与限制见 [快速提示词说明](a2f_tts_motion_bridge/docs/FAST_PROMPTS.md)。
+
 新增独立 `prompt_face_server`：提示词或结构化计划 → 13 DOF，不依赖音频或 A2F 推理。
 沿用现有 gRPC ACTION/NPY 分段输出；支持微笑、皱眉、抬眉、眨眼及程度/有限情感修饰。
 启动、输入协议、边界与测试见 [独立提示词表情说明](a2f_tts_motion_bridge/docs/STANDALONE_PROMPT_FACE.md)。两个运动源需由调用方互斥选择。
